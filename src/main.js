@@ -10,6 +10,8 @@ import { registerModelSections } from './ui/modelPanel.js';
 import { registerLandmarkSections } from './ui/landmarkPanel.js';
 import { createLandmarkView } from './ui/landmarkView.js';
 import { createLandmarkController } from './ui/landmarkController.js';
+import { registerWeightSections } from './ui/weightPanel.js';
+import { createWeightController } from './ui/weightController.js';
 
 // Model 1 birim yüksekliğe normalize edildiği için kamera ve grid ölçüleri
 // sabit kalabiliyor.
@@ -40,13 +42,28 @@ const state = { model: null, stats: null };
 
 const panel = createPanel(document.getElementById('panel'));
 const landmarkView = createLandmarkView({ scene, camera, renderer });
+
+// Ham (skinlenmemiş) mesh her zaman saklanıyor: weight hesabı bundan
+// yeniden üretiliyor ve iskelet değişince sahne buna geri dönüyor.
+let baseMesh = null;
+let currentMesh = null;
+
 const landmarks = createLandmarkController({
   view: landmarkView,
+  onRefresh: () => panel.refresh(),
+  onSkeletonChange: () => weights?.invalidate(),
+});
+
+const weights = createWeightController({
+  landmarks,
+  getBaseMesh: () => baseMesh,
+  setSceneMesh: (mesh) => setSceneMesh(mesh),
   onRefresh: () => panel.refresh(),
 });
 
 registerModelSections(panel, state);
 registerLandmarkSections(panel, landmarks);
+registerWeightSections(panel, weights);
 panel.refresh();
 
 const picker = createPicker({
@@ -54,8 +71,6 @@ const picker = createPicker({
   camera,
   onPick: (hit) => landmarks.handlePick(hit),
 });
-
-let currentMesh = null;
 
 setupDragAndDrop();
 window.addEventListener('resize', onResize);
@@ -128,16 +143,28 @@ async function handleAnnotationFile(file) {
   }
 }
 
+/** Sahnedeki modeli değiştirir: ham mesh <-> SkinnedMesh geçişi buradan. */
+function setSceneMesh(mesh) {
+  if (currentMesh === mesh) return;
+
+  if (currentMesh) scene.remove(currentMesh);
+  currentMesh = mesh;
+  scene.add(currentMesh);
+  picker.setTarget(currentMesh);
+}
+
 function setModel(loaded) {
   if (currentMesh) {
     scene.remove(currentMesh);
-    currentMesh.geometry.dispose();
     currentMesh = null;
   }
+  if (baseMesh && baseMesh !== loaded.mesh) {
+    baseMesh.geometry.dispose();
+  }
 
-  currentMesh = loaded.mesh;
-  scene.add(currentMesh);
-  picker.setTarget(currentMesh);
+  baseMesh = loaded.mesh;
+  weights.reset();
+  setSceneMesh(baseMesh);
 
   state.model = loaded;
   state.stats = null;
