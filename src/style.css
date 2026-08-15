@@ -337,6 +337,55 @@ body {
   color: #e0a852;
 }
 
+/* ------------------------------------------------------------- kontroller */
+
+.slider {
+  margin-top: 8px;
+}
+
+.slider__header {
+  display: flex;
+  justify-content: space-between;
+  font: var(--mono);
+  color: var(--text-dim);
+}
+
+.slider__value {
+  color: var(--text);
+}
+
+.slider__input {
+  width: 100%;
+  margin: 4px 0 0;
+  accent-color: var(--accent);
+}
+
+.select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.select__input {
+  flex: 1;
+  padding: 4px 6px;
+  font: var(--font);
+  color: var(--text);
+  background: #262b34;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.divider {
+  height: 1px;
+  margin: 10px 0;
+  background: var(--panel-border);
+}
+
 .issue {
   margin: 8px 0 0;
   padding: 7px 9px;

@@ -38,6 +38,57 @@ export function row(...children) {
   return element('div', 'row', null, ...children);
 }
 
+/**
+ * Etiketli slider. Değer canlı güncelleniyor ama onChange sadece bırakınca
+ * tetikleniyor: weight hesabı gibi pahalı işler her piksel hareketinde
+ * çalışmasın.
+ */
+export function slider(label, value, { min, max, step = 0.1, live = false }, onChange) {
+  const valueNode = element('span', 'slider__value', formatSliderValue(value, step));
+
+  const input = element('input', 'slider__input');
+  input.type = 'range';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = String(step);
+  input.value = String(value);
+
+  input.addEventListener('input', () => {
+    valueNode.textContent = formatSliderValue(Number(input.value), step);
+    if (live) onChange(Number(input.value));
+  });
+
+  if (!live) {
+    input.addEventListener('change', () => onChange(Number(input.value)));
+  }
+
+  return element(
+    'div',
+    'slider',
+    null,
+    element('div', 'slider__header', null, element('span', 'slider__label', label), valueNode),
+    input,
+  );
+}
+
+function formatSliderValue(value, step) {
+  const decimals = step >= 1 ? 0 : String(step).split('.')[1]?.length ?? 1;
+  return value.toFixed(decimals);
+}
+
+export function select(label, value, options, onChange) {
+  const node = element('select', 'select__input');
+  for (const option of options) {
+    const item = element('option', null, option.label);
+    item.value = option.id;
+    if (option.id === value) item.selected = true;
+    node.append(item);
+  }
+  node.addEventListener('change', () => onChange(node.value));
+
+  return element('label', 'select', null, element('span', 'select__label', label), node);
+}
+
 export function formatNumber(value) {
   return value.toLocaleString('tr-TR');
 }
