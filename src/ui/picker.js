@@ -81,18 +81,23 @@ export function createPicker({ renderer, camera, onPick }) {
     };
   }
 
-  /** Vurulan üçgenin köşelerinden tıklama noktasına en yakın olanı. */
+  /**
+   * Vurulan üçgenin köşelerinden tıklama noktasına en yakın olanı.
+   *
+   * `getVertexPosition` kullanılıyor çünkü SkinnedMesh bunu override edip
+   * kemik dönüşümünü uyguluyor: model poz verilmişken ham attribute ile
+   * karşılaştırmak yanlış vertex'i seçerdi.
+   */
   function nearestVertexOfFace(hit) {
     if (!hit.face || !target) return null;
 
-    const position = target.geometry.getAttribute('position');
     const vertex = new THREE.Vector3();
 
     let best = null;
     let bestDistance = Infinity;
 
     for (const candidate of [hit.face.a, hit.face.b, hit.face.c]) {
-      vertex.fromBufferAttribute(position, candidate);
+      target.getVertexPosition(candidate, vertex);
       const distance = vertex.distanceTo(hit.point);
       if (distance < bestDistance) {
         bestDistance = distance;
