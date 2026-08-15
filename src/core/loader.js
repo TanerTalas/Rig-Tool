@@ -88,6 +88,13 @@ function countMeshes(root) {
  */
 function bakeWorldTransform(source) {
   const geometry = source.geometry.clone();
+
+  // Matrisi uygulamadan ÖNCE dequantize et. gltfpack/Meshy çıktıları
+  // KHR_mesh_quantization ile geliyor: pozisyonlar Uint16 tamsayı, gerçek
+  // ölçek node transform'unda. Tamsayı buffer'a float sonuç yazılırsa
+  // koordinatlar yuvarlanıp model tek noktaya çöker.
+  dequantizeAttributes(geometry);
+
   geometry.applyMatrix4(source.matrixWorld);
 
   if (!geometry.index) {
@@ -106,6 +113,41 @@ function bakeWorldTransform(source) {
   }
 
   return geometry;
+}
+
+/**
+ * Tamsayı/interleaved attribute'ları bağımsız Float32 dizilerine çevirir.
+ *
+ * İki fayda: (1) quantize edilmiş buffer'a float yazma sorunu ortadan kalkar,
+ * (2) interleaved buffer ayrıştırılır; ileride skinIndex/skinWeight yazarken
+ * ve vertex color ile heatmap boyarken düz diziler üzerinde çalışacağız.
+ */
+function dequantizeAttributes(geometry) {
+  for (const name of ['position', 'normal', 'uv', 'uv1', 'color', 'tangent']) {
+    const attribute = geometry.getAttribute(name);
+    if (!attribute) continue;
+    if (attribute.array instanceof Float32Array && !attribute.isInterleavedBufferAttribute) {
+      continue;
+    }
+
+    geometry.setAttribute(name, toFloat32Attribute(attribute));
+  }
+}
+
+function toFloat32Attribute(attribute) {
+  const itemSize = attribute.itemSize;
+  const array = new Float32Array(attribute.count * itemSize);
+  const getters = ['getX', 'getY', 'getZ', 'getW'];
+
+  // getX/getY/... normalized attribute'ları kendisi denormalize ediyor,
+  // bu yüzden ham array yerine bunları kullanıyoruz.
+  for (let i = 0; i < attribute.count; i += 1) {
+    for (let c = 0; c < itemSize; c += 1) {
+      array[i * itemSize + c] = attribute[getters[c]](i);
+    }
+  }
+
+  return new THREE.BufferAttribute(array, itemSize, false);
 }
 
 /**
