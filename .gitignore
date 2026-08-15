@@ -473,3 +473,6 @@ landmarks.json
 regions.json
 *.landmarks*.json
 *.regions*.json
+*.rig.json
+*.context.md
+*.rigged.glb
