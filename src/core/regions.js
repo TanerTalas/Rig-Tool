@@ -139,6 +139,113 @@ export function floodFill(graph, normals, seed, options = {}) {
 }
 
 /**
+ * İki vertex arasındaki en kısa yüzey yolu.
+ *
+ * Kullanıcı parçanın çevresine nokta nokta tıklıyor, aradaki yolu biz
+ * dolduruyoruz: elin bileğine dört tıklama yapmak, o dört noktayı birleştiren
+ * bir halka çiziyor.
+ */
+export function shortestPath(graph, from, to) {
+  const distances = new Float64Array(graph.weldedCount).fill(Infinity);
+  const previous = new Int32Array(graph.weldedCount).fill(-1);
+  const visited = new Uint8Array(graph.weldedCount);
+  const queue = [from];
+  distances[from] = 0;
+
+  while (queue.length) {
+    let bestIndex = 0;
+    for (let i = 1; i < queue.length; i += 1) {
+      if (distances[queue[i]] < distances[queue[bestIndex]]) bestIndex = i;
+    }
+
+    const current = queue[bestIndex];
+    queue[bestIndex] = queue[queue.length - 1];
+    queue.pop();
+
+    if (visited[current]) continue;
+    visited[current] = 1;
+    if (current === to) break;
+
+    for (let i = graph.neighborOffsets[current]; i < graph.neighborOffsets[current + 1]; i += 1) {
+      const neighbor = graph.neighborIndices[i];
+      if (visited[neighbor]) continue;
+
+      const candidate = distances[current] + graph.neighborWeights[i];
+      if (candidate >= distances[neighbor]) continue;
+
+      distances[neighbor] = candidate;
+      previous[neighbor] = current;
+      queue.push(neighbor);
+    }
+  }
+
+  if (!Number.isFinite(distances[to])) return null;
+
+  const path = [to];
+  let step = to;
+  while (step !== from) {
+    step = previous[step];
+    if (step < 0) return null;
+    path.push(step);
+  }
+
+  return path.reverse();
+}
+
+/**
+ * Bariyeri aşmadan yayılan doldurma.
+ *
+ * Çizilen halka "duvar" oluyor, tıklanan taraf doluyor. Halka kapalı değilse
+ * yayılma etrafından dolaşıp tüm modeli seçer; kullanıcı bunu gördüğünde ya
+ * halkayı kapatır ya da tersine çevirir.
+ *
+ * @param {Set<number>|Uint8Array} blocked bariyer vertex'leri
+ */
+export function floodFillBounded(graph, seed, blocked) {
+  const isBlocked = blocked instanceof Set ? (v) => blocked.has(v) : (v) => blocked[v] === 1;
+
+  const visited = new Uint8Array(graph.weldedCount);
+  const stack = [seed];
+  const result = [];
+
+  if (isBlocked(seed)) return Uint32Array.from([seed]);
+  visited[seed] = 1;
+
+  while (stack.length) {
+    const current = stack.pop();
+    result.push(current);
+
+    for (let i = graph.neighborOffsets[current]; i < graph.neighborOffsets[current + 1]; i += 1) {
+      const neighbor = graph.neighborIndices[i];
+      if (visited[neighbor]) continue;
+
+      visited[neighbor] = 1;
+      // Bariyerin kendisi seçime dahil, ötesi değil.
+      if (isBlocked(neighbor)) {
+        result.push(neighbor);
+        continue;
+      }
+
+      stack.push(neighbor);
+    }
+  }
+
+  return Uint32Array.from(result);
+}
+
+/** Seçimin tümleyeni: tüm vertex'ler eksi seçim. */
+export function invertSelection(graph, selection) {
+  const selected = new Set(selection);
+  const result = [];
+
+  for (let v = 0; v < graph.weldedCount; v += 1) {
+    if (!selected.has(v)) result.push(v);
+  }
+
+  return Uint32Array.from(result);
+}
+
+/**
  * Bölge deposu.
  * Bölgeler welded vertex index'leriyle tutuluyor; dosyaya yazarken orijinal
  * index'lere açılıyor ki başka bir araç da okuyabilsin.

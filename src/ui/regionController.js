@@ -4,6 +4,9 @@ import {
   createRegionStore,
   DEFAULT_SELECTION,
   floodFill,
+  floodFillBounded,
+  invertSelection,
+  shortestPath,
 } from '../core/regions.js';
 import { checkModelHash, downloadJSON, pickJSONFile } from '../core/annotations.js';
 
@@ -29,6 +32,11 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
   let enabled = false;
   let seed = null;
   let selection = [];
+  // 'spread' = tek tıkla yayılan seçim, 'path' = nokta nokta çizilen halka
+  let mode = 'path';
+  let pathPoints = [];
+  let pathVertices = [];
+  let pathClosed = false;
   let maxDistance = DEFAULT_SELECTION.maxDistance;
   let maxAngle = DEFAULT_SELECTION.maxAngle;
   let activeRegionId = null;
@@ -40,7 +48,33 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
 
   function repaint() {
     if (!enabled || !graph) return;
-    view.paintRegions({ selection, regions: store.list, graph });
+    // Çizilen halka seçimden ayrı bir renkte gösteriliyor.
+    view.paintRegions({ selection, regions: store.list, graph, path: pathVertices });
+  }
+
+  /** Tıklanan noktaları en kısa yüzey yollarıyla birleştirir. */
+  function rebuildPath() {
+    pathVertices = [];
+    if (pathPoints.length < 2) {
+      pathVertices = [...pathPoints];
+      return;
+    }
+
+    const collected = new Set();
+    const pairs = pathClosed
+      ? pathPoints.map((point, i) => [point, pathPoints[(i + 1) % pathPoints.length]])
+      : pathPoints.slice(0, -1).map((point, i) => [point, pathPoints[i + 1]]);
+
+    for (const [from, to] of pairs) {
+      const segment = shortestPath(graph, from, to);
+      if (!segment) {
+        console.warn('[region] İki nokta arasında yüzey yolu yok, ayrı adalarda olabilirler.');
+        continue;
+      }
+      for (const vertex of segment) collected.add(vertex);
+    }
+
+    pathVertices = Array.from(collected);
   }
 
   function recompute() {
@@ -81,6 +115,18 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     },
     get maxAngle() {
       return maxAngle;
+    },
+    get mode() {
+      return mode;
+    },
+    get pathPointCount() {
+      return pathPoints.length;
+    },
+    get pathVertexCount() {
+      return pathVertices.length;
+    },
+    get pathClosed() {
+      return pathClosed;
     },
     get regions() {
       return store.list;
@@ -127,6 +173,56 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       refresh();
     },
 
+    setMode(value) {
+      mode = value;
+      controller.clearPath();
+      controller.clearSelection();
+      refresh();
+    },
+
+    /** Halkayı kapatır: son nokta ilk noktaya bağlanır. */
+    closePath() {
+      if (pathPoints.length < 3) return;
+      pathClosed = true;
+      rebuildPath();
+      repaint();
+      refresh();
+    },
+
+    /** Halkanın bir tarafını doldurur; tıklanan taraf seçilir. */
+    fillFrom(welded) {
+      if (!pathVertices.length) return;
+      selection = Array.from(floodFillBounded(graph, welded, new Set(pathVertices)));
+      repaint();
+      refresh();
+      console.log('[region] halka dolduruldu:', selection.length, 'vertex');
+    },
+
+    invert() {
+      if (!graph || !selection.length) return;
+      selection = Array.from(invertSelection(graph, selection));
+      repaint();
+      refresh();
+      console.log('[region] seçim tersine çevrildi:', selection.length, 'vertex');
+    },
+
+    undoPathPoint() {
+      if (!pathPoints.length) return;
+      pathPoints.pop();
+      pathClosed = false;
+      rebuildPath();
+      repaint();
+      refresh();
+    },
+
+    clearPath() {
+      pathPoints = [];
+      pathVertices = [];
+      pathClosed = false;
+      repaint();
+      refresh();
+    },
+
     setMaxDistance(value) {
       maxDistance = value;
       recompute();
@@ -139,11 +235,25 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       refresh();
     },
 
-    /** Modele tıklama: seçimin başlangıç noktası. */
+    /** Modele tıklama: moda göre nokta ekler veya yayılma yapar. */
     handlePick(hit) {
       if (!graph || hit.nearestVertexIndex === null || hit.nearestVertexIndex === undefined) return;
 
       const welded = graph.originalToWelded[hit.nearestVertexIndex];
+
+      if (mode === 'path') {
+        // Halka kapandıktan sonraki tıklama "hangi tarafı istiyorum" demek.
+        if (pathClosed) {
+          controller.fillFrom(welded);
+          return;
+        }
+
+        pathPoints.push(welded);
+        rebuildPath();
+        repaint();
+        refresh();
+        return;
+      }
 
       if (hit.shiftKey || hit.altKey) {
         // Shift ekler, Alt çıkarır: aynı yayılmayı yeni noktadan hesaplayıp
@@ -182,6 +292,9 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       activeRegionId = region.id;
       seed = null;
       selection = [];
+      pathPoints = [];
+      pathVertices = [];
+      pathClosed = false;
       repaint();
       refresh();
 

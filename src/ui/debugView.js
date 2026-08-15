@@ -25,6 +25,7 @@ const MAX_INFLUENCES = 4;
 // Bölge görünümünde seçilmemiş yüzeyin rengi ve aktif seçimin rengi.
 const BASE_COLOR = '#9aa3b2';
 const SELECTION_COLOR = '#ffc043';
+const PATH_COLOR = '#ff4d6d';
 
 export function createDebugView() {
   const heatmapMaterial = new THREE.MeshBasicMaterial({
@@ -107,7 +108,7 @@ export function createDebugView() {
    * @param {Array} params.regions kayıtlı bölgeler
    * @param {object} params.graph welded -> orijinal vertex eşlemesi için
    */
-  function paintRegions({ selection, regions, graph }) {
+  function paintRegions({ selection, regions, graph, path }) {
     if (!mesh || !graph) return;
 
     const geometry = mesh.geometry;
@@ -138,6 +139,14 @@ export function createDebugView() {
     // Aktif seçim en üstte: kayıtlı bölgelerin üzerine yazıyor.
     color.set(SELECTION_COLOR).convertSRGBToLinear();
     for (const welded of selection ?? []) {
+      for (const original of graph.weldedToOriginal[welded]) {
+        attribute.setXYZ(original, color.r, color.g, color.b);
+      }
+    }
+
+    // Çizilen halka en üstte: nereye çizdiğini seçimin içinde de görmelisin.
+    color.set(PATH_COLOR).convertSRGBToLinear();
+    for (const welded of path ?? []) {
       for (const original of graph.weldedToOriginal[welded]) {
         attribute.setXYZ(original, color.r, color.g, color.b);
       }

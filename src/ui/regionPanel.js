@@ -9,6 +9,7 @@ import { REGION_PRESETS } from '../core/regions.js';
  */
 export function registerRegionSections(panel, controller) {
   panel.addSection({
+    group: 'region',
     title: () => 'Bölge seçimi',
     render: () => {
       if (!controller.isAvailable) return null;
@@ -30,19 +31,57 @@ export function registerRegionSections(panel, controller) {
       }
 
       nodes.push(
-        slider('yayılma mesafesi', controller.maxDistance, { min: 0.01, max: 0.6, step: 0.01 }, (value) =>
-          controller.setMaxDistance(value),
-        ),
-        slider('kenar açısı', controller.maxAngle, { min: 5, max: 180, step: 5 }, (value) =>
-          controller.setMaxAngle(value),
-        ),
-        element(
-          'p',
-          'hint',
-          'Yayılma keskin kenarlarda durur: açı eşiği düştükçe seçim daha erken ' +
-            'kesilir, 180 açı kontrolünü kapatır. Shift ile ekle, Alt ile çıkar.',
+        select(
+          'seçim yöntemi',
+          controller.mode,
+          [
+            { id: 'path', label: 'Çizerek (nokta nokta)' },
+            { id: 'spread', label: 'Yayılarak (tek tık)' },
+          ],
+          (value) => controller.setMode(value),
         ),
       );
+
+      if (controller.mode === 'path') {
+        nodes.push(
+          stat('nokta', String(controller.pathPointCount)),
+          stat('halka vertex', String(controller.pathVertexCount)),
+          element(
+            'p',
+            'hint',
+            controller.pathClosed
+              ? 'Halka kapalı. Şimdi istediğin tarafa tıkla, o taraf dolar. ' +
+                'Yanlış taraf dolduysa "Tersine çevir".'
+              : 'Ayırmak istediğin parçanın çevresine sırayla tıkla; noktalar ' +
+                'yüzeydeki en kısa yolla birleşir. En az 3 nokta koyup halkayı kapat.',
+          ),
+          row(
+            button('Halkayı kapat', () => controller.closePath(), {
+              className: 'button button--half',
+              disabled: controller.pathPointCount < 3 || controller.pathClosed,
+            }),
+            button('Son noktayı sil', () => controller.undoPathPoint(), {
+              className: 'button button--half',
+              disabled: !controller.pathPointCount,
+            }),
+          ),
+        );
+      } else {
+        nodes.push(
+          slider('yayılma mesafesi', controller.maxDistance, { min: 0.01, max: 0.6, step: 0.01 }, (value) =>
+            controller.setMaxDistance(value),
+          ),
+          slider('kenar açısı', controller.maxAngle, { min: 5, max: 180, step: 5 }, (value) =>
+            controller.setMaxAngle(value),
+          ),
+          element(
+            'p',
+            'hint',
+            'Yayılma keskin kenarlarda durur: açı eşiği düştükçe seçim daha erken ' +
+              'kesilir, 180 açı kontrolünü kapatır. Shift ile ekle, Alt ile çıkar.',
+          ),
+        );
+      }
 
       if (controller.hasSelection) {
         // Hazır parça isimleri: etiketleme hızlansın, isimlendirme tutarlı olsun.
@@ -65,15 +104,17 @@ export function registerRegionSections(panel, controller) {
 
         nodes.push(
           stat('seçili vertex', formatNumber(controller.selectionSize)),
+          button('Tersine çevir', () => controller.invert()),
           datalist,
           input,
           row(
             button('Kaydet', () => controller.saveRegion(input.value), {
               className: 'button button--half',
             }),
-            button('Temizle', () => controller.clearSelection(), {
-              className: 'button button--half',
-            }),
+            button('Temizle', () => {
+              controller.clearSelection();
+              controller.clearPath();
+            }, { className: 'button button--half' }),
           ),
         );
       } else {
@@ -85,6 +126,7 @@ export function registerRegionSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'region',
     title: () => `Bölgeler (${controller.regions.length})`,
     render: () => {
       if (!controller.isAvailable || !controller.enabled) return null;
