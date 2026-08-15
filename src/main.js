@@ -13,6 +13,8 @@ import { createLandmarkController } from './ui/landmarkController.js';
 import { registerWeightSections } from './ui/weightPanel.js';
 import { createWeightController } from './ui/weightController.js';
 import { registerDebugSections } from './ui/debugPanel.js';
+import { registerRegionSections } from './ui/regionPanel.js';
+import { createRegionController } from './ui/regionController.js';
 import { createDebugController } from './ui/debugController.js';
 import { createDebugView } from './ui/debugView.js';
 
@@ -65,9 +67,17 @@ const weights = createWeightController({
   setSceneMesh: (mesh) => setSceneMesh(mesh),
   onRefresh: () => panel.refresh(),
   onWeightsChanged: () => debug?.onWeightsChanged(),
+  applyOverrides: (weightData) => regions?.applyOverrides(weightData),
 });
 
 const debug = createDebugController({
+  view: debugView,
+  landmarks,
+  weights,
+  onRefresh: () => panel.refresh(),
+});
+
+const regions = createRegionController({
   view: debugView,
   landmarks,
   weights,
@@ -78,6 +88,7 @@ registerModelSections(panel, state);
 registerLandmarkSections(panel, landmarks);
 registerWeightSections(panel, weights);
 registerDebugSections(panel, debug);
+registerRegionSections(panel, regions);
 panel.refresh();
 
 const picker = createPicker({
@@ -86,7 +97,9 @@ const picker = createPicker({
   // Tıklama önceliği: yerleştirilecek bir landmark varsa o kazanır, yoksa
   // skinlenmiş modelde vertex incelemesine düşer.
   onPick: (hit) => {
-    if (landmarks.activeId) {
+    if (regions.enabled) {
+      regions.handlePick(hit);
+    } else if (landmarks.activeId) {
       landmarks.handlePick(hit);
     } else if (debug.isAvailable) {
       debug.handlePick(hit);
@@ -102,6 +115,7 @@ if (import.meta.env.DEV) {
     landmarks,
     weights,
     debug,
+    regions,
     get mesh() {
       return currentMesh;
     },
@@ -206,7 +220,9 @@ async function handleAnnotationFile(file) {
   }
 
   try {
-    landmarks.applyJSON(await readJSONFile(file));
+    const json = await readJSONFile(file);
+    if (json?.regions) regions.applyJSON(json);
+    else landmarks.applyJSON(json);
   } catch (error) {
     console.error('[landmark] JSON okunamadı:', error);
   }
@@ -260,6 +276,7 @@ function analyzeMesh(mesh) {
   const elapsed = performance.now() - started;
 
   mesh.userData.adjacency = graph;
+  regions.setModel(state.model, graph);
   state.stats = graph.stats;
   panel.refresh();
 

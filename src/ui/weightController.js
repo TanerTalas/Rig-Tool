@@ -26,11 +26,16 @@ export function createWeightController({
   setSceneMesh,
   onRefresh,
   onWeightsChanged,
+  applyOverrides,
 }) {
   let power = DEFAULT_WEIGHT_OPTIONS.power;
   let smoothIterations = DEFAULT_WEIGHT_OPTIONS.smoothIterations;
   let method = 'geodesic';
   let radiusNormalization = DEFAULT_WEIGHT_OPTIONS.radiusNormalization;
+  // Override'sız ham sonuç ile bölge override'ları uygulanmış sonuç ayrı
+  // tutuluyor: bir bölgenin sabitlemesi kaldırıldığında ham değerlere
+  // dönebilmek gerekiyor.
+  let baseWeights = null;
   let weights = null;
   let stats = null;
   let leakage = null;
@@ -130,6 +135,14 @@ export function createWeightController({
         weights = computeNaiveWeights(mesh.geometry, rig.skeleton, { power });
       }
 
+      baseWeights = weights;
+      weights = {
+        skinIndices: baseWeights.skinIndices.slice(),
+        skinWeights: baseWeights.skinWeights.slice(),
+        stats: baseWeights.stats,
+      };
+      applyOverrides?.(weights);
+
       stats = weights.stats;
       leakage = measureLeakage(weights, rig.bones);
 
@@ -187,6 +200,33 @@ export function createWeightController({
       refresh();
     },
 
+    /**
+     * Bölge override'larını ham ağırlıkların üzerine yeniden uygular.
+     * Bölge eklenince, silinince veya başka kemiğe bağlanınca çağrılıyor.
+     */
+    reapplyOverrides() {
+      if (!baseWeights || !weights || !skinnedMesh) return;
+
+      weights.skinIndices.set(baseWeights.skinIndices);
+      weights.skinWeights.set(baseWeights.skinWeights);
+      applyOverrides?.(weights);
+
+      // Uint16BufferAttribute / Float32BufferAttribute kurucuları diziyi
+      // KOPYALIYOR, referans tutmuyor. Bu yüzden değerleri attribute'un kendi
+      // dizisine yazmak gerekiyor; sadece needsUpdate işaretlemek yetmez.
+      const geometry = skinnedMesh.geometry;
+      const indexAttribute = geometry.getAttribute('skinIndex');
+      const weightAttribute = geometry.getAttribute('skinWeight');
+      indexAttribute.array.set(weights.skinIndices);
+      weightAttribute.array.set(weights.skinWeights);
+      indexAttribute.needsUpdate = true;
+      weightAttribute.needsUpdate = true;
+
+      leakage = measureLeakage(weights, landmarks.skeleton.bones);
+      onWeightsChanged?.();
+      refresh();
+    },
+
     /** Kullanıcı bir kemiği elle döndürdü: artık hazır pozlardan biri değiliz. */
     markCustomPose() {
       poseId = 'custom';
@@ -198,6 +238,7 @@ export function createWeightController({
 
       skinnedMesh = null;
       weights = null;
+      baseWeights = null;
       stats = null;
       leakage = null;
       poseId = 'bind';
@@ -217,6 +258,7 @@ export function createWeightController({
     reset() {
       skinnedMesh = null;
       weights = null;
+      baseWeights = null;
       stats = null;
       leakage = null;
       poseId = 'bind';
