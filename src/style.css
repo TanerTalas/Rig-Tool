@@ -320,6 +320,23 @@ body {
   background: #2f3540;
 }
 
+.placement {
+  margin-top: 10px;
+  padding: 7px 9px;
+  background: #232830;
+  border-radius: var(--radius);
+}
+
+.placement__title {
+  margin-bottom: 4px;
+  font: var(--mono);
+  color: var(--text-dim);
+}
+
+.hint--warn {
+  color: #e0a852;
+}
+
 .status {
   margin: 0;
   font: var(--mono);

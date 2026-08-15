@@ -20,6 +20,7 @@ export function createLandmarkController({ view, onRefresh, onSkeletonChange }) 
   let markersVisible = true;
   let skeleton = null;
   let skeletonError = null;
+  let lastPlacement = null;
 
   store.subscribe(() => {
     view.setLandmarks(store.entries());
@@ -152,11 +153,29 @@ export function createLandmarkController({ view, onRefresh, onSkeletonChange }) 
       refresh();
     },
 
+    get lastPlacement() {
+      return lastPlacement;
+    },
+
     /** Picker'dan gelen tıklama. */
     handlePick(hit) {
       if (!activeId) return;
 
       const position = useCenterPoint ? hit.centerPoint : hit.surfacePoint;
+      const definition = getLandmarkDefinition(activeId);
+
+      // Teşhis: ışın ikiden fazla yüzey deldiyse ilk kabuk aradığımız uzuv
+      // olmayabilir (atkı, saç, bol kıyafet). Merkez tahmini o zaman
+      // landmark'ı yanlış parçanın içine koyar.
+      lastPlacement = {
+        id: activeId,
+        label: definition?.label ?? activeId,
+        shift: useCenterPoint ? hit.surfacePoint.distanceTo(hit.centerPoint) : 0,
+        thickness: hit.thickness,
+        hitCount: hit.hitCount,
+        suspicious: useCenterPoint && hit.hitCount > 2,
+      };
+
       store.set(activeId, position);
 
       console.log('[landmark]', activeId, {

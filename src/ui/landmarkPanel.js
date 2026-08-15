@@ -1,5 +1,35 @@
-import { button, checkbox, element, row } from './dom.js';
+import { button, checkbox, element, row, stat } from './dom.js';
 import { humanoidTemplate } from '../core/landmarks.js';
+
+/**
+ * Son yerleştirmenin teşhisi.
+ *
+ * "Kayma" tıklanan yüzey noktası ile landmark'ın son konumu arasındaki mesafe,
+ * "kalınlık" ışının deldiği ilk kabuğun kalınlığı. Işın ikiden fazla yüzey
+ * deldiyse ilk kabuk aradığımız uzuv olmayabilir (atkı, saç, bol kıyafet) ve
+ * landmark yanlış parçanın içine düşmüş olabilir; bu durumda uyarı çıkıyor.
+ */
+function placementInfo(placement) {
+  if (!placement) return null;
+
+  return element(
+    'div',
+    'placement',
+    null,
+    element('div', 'placement__title', `son: ${placement.label}`),
+    stat('kayma', placement.shift.toFixed(3)),
+    stat('kalınlık', placement.thickness.toFixed(3)),
+    stat('delinen yüzey', String(placement.hitCount), placement.suspicious),
+    placement.suspicious
+      ? element(
+          'p',
+          'hint hint--warn',
+          'Işın ikiden fazla yüzey deldi. İlk kabuk aradığın uzuv olmayabilir; ' +
+            'konumu kontrol et, gerekirse merkez tahminini kapatıp tekrar tıkla.',
+        )
+      : null,
+  );
+}
 
 /**
  * Landmark bölümü: rehberli akış, liste, aynalama ve JSON kaydet/yükle.
@@ -38,8 +68,11 @@ export function registerLandmarkSections(panel, controller) {
         element(
           'p',
           'hint',
-          'Merkez tahmini açıkken tıklanan nokta, uzvun ön ve arka yüzeyinin ortasına kaydırılır; eklem yüzeyde değil içeride olduğu için iskelet daha doğru oturur.',
+          'Merkez tahmini, tıklanan noktayı bakış yönünde ön ve arka yüzeyin ortasına iter. ' +
+            'Bu yüzden yan taraftaki landmark\'ları (kalça, omuz, dirsek, diz) önden bakarak işaretle; ' +
+            'yandan bakarken tıklarsan nokta gövdenin ortasına kayar.',
         ),
+        placementInfo(controller.lastPlacement),
       ];
     },
   });
