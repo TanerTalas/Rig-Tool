@@ -94,9 +94,56 @@ const picker = createPicker({
   },
 });
 
+// Geliştirme modunda sahneyi konsoldan incelemek için dışarı aç.
+if (import.meta.env.DEV) {
+  window.__rig = {
+    scene,
+    camera,
+    landmarks,
+    weights,
+    debug,
+    get mesh() {
+      return currentMesh;
+    },
+    get baseMesh() {
+      return baseMesh;
+    },
+  };
+}
+
 setupDragAndDrop();
+loadFromQuery();
 window.addEventListener('resize', onResize);
 renderer.setAnimationLoop(render);
+
+/**
+ * Geliştirme kolaylığı: ?model=boy.glb&landmarks=boy.landmarks.json ile
+ * sürükle-bırak yapmadan yükler. Aynı modeli defalarca test ederken
+ * her seferinde dosya sürüklemek zaman kaybı.
+ */
+async function loadFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const modelPath = params.get('model');
+  if (!modelPath) return;
+
+  try {
+    const model = await fetchAsFile(modelPath);
+    await handleFile(model);
+
+    const landmarkPath = params.get('landmarks');
+    if (landmarkPath) {
+      landmarks.applyJSON(await (await fetch(`/${landmarkPath}`)).json());
+    }
+  } catch (error) {
+    console.error('[loader] URL üzerinden yükleme başarısız:', error);
+  }
+}
+
+async function fetchAsFile(path) {
+  const response = await fetch(`/${path}`);
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  return new File([await response.blob()], path.split('/').pop());
+}
 
 /* -------------------------------------------------------------------- sahne */
 
