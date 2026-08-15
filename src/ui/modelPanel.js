@@ -7,6 +7,7 @@ import { element, formatNumber, stat } from './dom.js';
  */
 export function registerModelSections(panel, state) {
   panel.addSection({
+    group: 'rig',
     title: () => 'Model',
     render: () => {
       if (!state.model) return null;
@@ -19,6 +20,7 @@ export function registerModelSections(panel, state) {
   });
 
   panel.addSection({
+    group: 'rig',
     title: () => 'Mesh',
     render: () => {
       if (!state.model) return null;

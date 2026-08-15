@@ -11,6 +11,7 @@ import { WEIGHT_METHODS } from './weightController.js';
  */
 export function registerWeightSections(panel, controller) {
   panel.addSection({
+    group: 'weight',
     title: () => 'Weight',
     render: () => {
       if (!controller.canCompute) {
@@ -69,6 +70,7 @@ export function registerWeightSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'weight',
     title: () => 'Karşılaştırma',
     render: () => {
       const { naive, geodesic } = controller.results;
@@ -108,6 +110,7 @@ export function registerWeightSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'weight',
     title: () => 'Sonuç',
     render: () => {
       const stats = controller.stats;
@@ -139,6 +142,7 @@ export function registerWeightSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'weight',
     title: () => 'Test pozu',
     render: () => {
       if (!controller.isSkinned) return null;

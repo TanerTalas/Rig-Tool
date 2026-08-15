@@ -6,6 +6,7 @@ import { button, checkbox, element, formatNumber, select, slider, stat } from '.
  */
 export function registerDebugSections(panel, controller) {
   panel.addSection({
+    group: 'weight',
     title: () => 'Heatmap',
     render: () => {
       if (!controller.isAvailable) return null;
@@ -49,6 +50,7 @@ export function registerDebugSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'weight',
     title: () => `Poz: ${controller.selectedBoneName ?? '—'}`,
     render: () => {
       if (!controller.isAvailable || controller.selectedBone === null) return null;
@@ -74,6 +76,7 @@ export function registerDebugSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'weight',
     title: () => 'Vertex incele',
     render: () => {
       if (!controller.isAvailable) return null;

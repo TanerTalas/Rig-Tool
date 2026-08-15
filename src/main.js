@@ -84,6 +84,10 @@ const regions = createRegionController({
   onRefresh: () => panel.refresh(),
 });
 
+panel.addGroup({ id: 'rig', label: 'Rig', title: 'Model, landmark ve iskelet', available: () => Boolean(state.model) });
+panel.addGroup({ id: 'weight', label: 'Ağırlık', title: 'Weight, heatmap ve poz', available: () => weights.canCompute });
+panel.addGroup({ id: 'region', label: 'Bölge', title: 'Bölge etiketleme ve sabitleme', available: () => regions.isAvailable });
+
 registerModelSections(panel, state);
 registerLandmarkSections(panel, landmarks);
 registerWeightSections(panel, weights);

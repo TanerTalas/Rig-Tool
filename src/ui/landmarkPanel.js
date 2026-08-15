@@ -41,6 +41,7 @@ function placementInfo(placement) {
  */
 export function registerLandmarkSections(panel, controller) {
   panel.addSection({
+    group: 'rig',
     title: () => `Landmark (${controller.placedCount}/${humanoidTemplate.landmarks.length})`,
     render: () => {
       if (!controller.isReady) return null;
@@ -78,6 +79,7 @@ export function registerLandmarkSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'rig',
     title: () => 'Liste',
     render: () => {
       if (!controller.isReady) return null;
@@ -109,6 +111,7 @@ export function registerLandmarkSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'rig',
     title: () => 'Kontrol',
     render: () => {
       if (!controller.isReady) return null;
@@ -150,6 +153,7 @@ export function registerLandmarkSections(panel, controller) {
   });
 
   panel.addSection({
+    group: 'rig',
     title: () => 'İskelet',
     render: () => {
       if (!controller.isReady) return null;
