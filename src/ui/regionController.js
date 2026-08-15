@@ -91,6 +91,12 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     get lastOverride() {
       return lastOverride;
     },
+    get labeledCount() {
+      return store.labeledCount;
+    },
+    get vertexCount() {
+      return graph?.weldedCount ?? 0;
+    },
     get boneNames() {
       return landmarks.skeleton?.bones.map((bone) => bone.name) ?? [];
     },
@@ -207,9 +213,16 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       refresh();
     },
 
-    /** Bölgenin tüm ağırlığını tek kemiğe verir. */
+    /** Bölgenin ağırlığını tek kemiğe verir. */
     bindRegion(id, boneName) {
       store.bindTo(id, boneName || null);
+      controller.reapply();
+      refresh();
+    },
+
+    /** Sabitleme oranı: 1 tamamen kemiğe, 0.5 yarı yarıya karışık. */
+    setRegionStrength(id, strength) {
+      store.setStrength(id, strength);
       controller.reapply();
       refresh();
     },

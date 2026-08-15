@@ -23,6 +23,20 @@ export const DEFAULT_SELECTION = {
 };
 
 // Bölge renkleri sırayla dağıtılıyor; okunabilir ve birbirinden ayrık tonlar.
+/**
+ * Etiketleme için hazır parça isimleri.
+ *
+ * Bölgeler sadece weight düzeltmek için değil, modelin parçalarını
+ * ADLANDIRMAK için de var: "burası atkı, burası sol el" bilgisi bir kez
+ * çıkarıldığında regions.json ile birlikte taşınıyor ve sonraki her işte
+ * (texture boyama, parça bazlı malzeme, animasyon kısıtları) kullanılabiliyor.
+ */
+export const REGION_PRESETS = [
+  'Kafa', 'Saç', 'Yüz', 'Boyun', 'Atkı', 'Yaka', 'Pelerin', 'Kıyafet',
+  'Kemer', 'Etek', 'Sol El', 'Sağ El', 'Sol Kol', 'Sağ Kol',
+  'Sol Ayak', 'Sağ Ayak', 'Sol Bacak', 'Sağ Bacak', 'Aksesuar',
+];
+
 export const REGION_COLORS = [
   '#e05252', '#4da3ff', '#62e08a', '#e0a852', '#b98ce0',
   '#4ecdc4', '#ff8fab', '#c9d64a', '#8d9db6', '#e07a3f',
@@ -138,12 +152,33 @@ export function createRegionStore() {
       return regions;
     },
 
-    add({ name, vertices, boundBone = null }) {
+    /**
+     * @param {object} params
+     * @param {boolean} [params.exclusive] true ise bu vertex'ler diğer
+     *   bölgelerden çıkarılır. Etiketleme bir bölüştürme olmalı: bir vertex
+     *   hem "atkı" hem "el" olamaz, yoksa hangi kemiğe sabitleneceği
+     *   bölgelerin sırasına kalır.
+     */
+    add({ name, vertices, boundBone = null, strength = 1, exclusive = true }) {
+      if (exclusive) {
+        const claimed = new Set(vertices);
+        for (const other of regions) {
+          const kept = Array.from(other.vertices).filter((v) => !claimed.has(v));
+          if (kept.length !== other.vertices.length) {
+            other.vertices = Uint32Array.from(kept);
+          }
+        }
+      }
+
       const region = {
         id: nextId,
         name: name?.trim() || `Bölge ${nextId}`,
         vertices: Uint32Array.from(vertices),
         boundBone,
+        // 1 = tamamen kemiğe sabit, 0.5 = yarı yarıya otomatik ağırlıkla
+        // karışık. Sert sabitleme parça sınırında kopma çizgisi bırakıyor;
+        // kısmi sabitleme o dikişi yumuşatıyor.
+        strength,
         color: REGION_COLORS[(nextId - 1) % REGION_COLORS.length],
       };
 
@@ -166,6 +201,15 @@ export function createRegionStore() {
       nextId = 1;
     },
 
+    /** Etiketlenmiş toplam vertex sayısı (bölgeler örtüşmüyor). */
+    get labeledCount() {
+      const seen = new Set();
+      for (const region of regions) {
+        for (const vertex of region.vertices) seen.add(vertex);
+      }
+      return seen.size;
+    },
+
     rename(id, name) {
       const region = this.get(id);
       if (region && name.trim()) region.name = name.trim();
@@ -176,6 +220,11 @@ export function createRegionStore() {
       if (region) region.boundBone = boneName;
     },
 
+    setStrength(id, strength) {
+      const region = this.get(id);
+      if (region) region.strength = Math.min(1, Math.max(0, strength));
+    },
+
     toJSON(modelHash, graph) {
       return {
         version: 1,
@@ -184,6 +233,7 @@ export function createRegionStore() {
         regions: regions.map((region) => ({
           name: region.name,
           boundBone: region.boundBone,
+          strength: region.strength,
           color: region.color,
           // Orijinal vertex index'leri: dosya bizim kaynaştırma algoritmamıza
           // bağımlı kalmasın.
@@ -202,7 +252,15 @@ export function createRegionStore() {
           const index = graph.originalToWelded[original];
           if (index !== undefined) welded.add(index);
         }
-        this.add({ name: entry.name, vertices: welded, boundBone: entry.boundBone ?? null });
+        // Dosyadaki bölüştürme aynen korunuyor; yükleme sırasında birbirini
+        // kırpmasınlar.
+        this.add({
+          name: entry.name,
+          vertices: welded,
+          boundBone: entry.boundBone ?? null,
+          strength: entry.strength ?? 1,
+          exclusive: false,
+        });
       }
 
       return regions.length;
@@ -239,15 +297,22 @@ export function applyRegionOverrides(weights, regions, boneNames, graph) {
 
     applied += 1;
 
+    const strength = region.strength ?? 1;
+
     for (const welded of region.vertices) {
       for (const original of graph.weldedToOriginal[welded]) {
         const base = original * MAX_INFLUENCES;
-        weights.skinIndices[base] = boneIndex;
-        weights.skinWeights[base] = 1;
 
-        for (let i = 1; i < MAX_INFLUENCES; i += 1) {
-          weights.skinIndices[base + i] = 0;
-          weights.skinWeights[base + i] = 0;
+        if (strength >= 1) {
+          weights.skinIndices[base] = boneIndex;
+          weights.skinWeights[base] = 1;
+
+          for (let i = 1; i < MAX_INFLUENCES; i += 1) {
+            weights.skinIndices[base + i] = 0;
+            weights.skinWeights[base + i] = 0;
+          }
+        } else {
+          blendTowardBone(weights, base, boneIndex, strength);
         }
 
         touched += 1;
@@ -256,6 +321,41 @@ export function applyRegionOverrides(weights, regions, boneNames, graph) {
   }
 
   return { regions: applied, vertices: touched };
+}
+
+/**
+ * Mevcut ağırlıkları hedef kemiğe doğru kaydırır.
+ * Otomatik ağırlıklar (1 - strength) ile çarpılıyor, hedef kemiğe strength
+ * ekleniyor. Hedef kemik listede yoksa en zayıf etkinin yerine geçiyor.
+ */
+function blendTowardBone(weights, base, boneIndex, strength) {
+  let slot = -1;
+  let weakest = 0;
+
+  for (let i = 0; i < MAX_INFLUENCES; i += 1) {
+    if (weights.skinIndices[base + i] === boneIndex && weights.skinWeights[base + i] > 0) slot = i;
+    if (weights.skinWeights[base + i] < weights.skinWeights[base + weakest]) weakest = i;
+  }
+
+  for (let i = 0; i < MAX_INFLUENCES; i += 1) {
+    weights.skinWeights[base + i] *= 1 - strength;
+  }
+
+  if (slot < 0) {
+    slot = weakest;
+    weights.skinIndices[base + slot] = boneIndex;
+    weights.skinWeights[base + slot] = 0;
+  }
+
+  weights.skinWeights[base + slot] += strength;
+
+  let total = 0;
+  for (let i = 0; i < MAX_INFLUENCES; i += 1) total += weights.skinWeights[base + i];
+  if (total <= 0) return;
+
+  for (let i = 0; i < MAX_INFLUENCES; i += 1) {
+    weights.skinWeights[base + i] /= total;
+  }
 }
 
 /** Bölgenin ortalama konumu; kamera odaklama ve etiketleme için. */

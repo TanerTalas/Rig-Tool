@@ -1,4 +1,5 @@
 import { button, checkbox, element, formatNumber, row, select, slider, stat } from './dom.js';
+import { REGION_PRESETS } from '../core/regions.js';
 
 /**
  * Bölge bölümü: seçim, isimlendirme, kemiğe sabitleme, JSON kaydet/yükle.
@@ -44,15 +45,27 @@ export function registerRegionSections(panel, controller) {
       );
 
       if (controller.hasSelection) {
+        // Hazır parça isimleri: etiketleme hızlansın, isimlendirme tutarlı olsun.
+        const listId = 'region-presets';
+        const datalist = element('datalist', null, null);
+        datalist.id = listId;
+        for (const preset of REGION_PRESETS) {
+          const option = element('option', null, null);
+          option.value = preset;
+          datalist.append(option);
+        }
+
         const input = element('input', 'text-input');
         input.type = 'text';
-        input.placeholder = 'bölge adı';
+        input.placeholder = 'bölge adı (Atkı, Sol El, ...)';
+        input.setAttribute('list', listId);
         input.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') controller.saveRegion(input.value);
         });
 
         nodes.push(
           stat('seçili vertex', formatNumber(controller.selectionSize)),
+          datalist,
           input,
           row(
             button('Kaydet', () => controller.saveRegion(input.value), {
@@ -103,7 +116,14 @@ export function registerRegionSections(panel, controller) {
         return item;
       });
 
-      const nodes = [element('ul', 'list', null, ...items)];
+      const nodes = [
+        element('ul', 'list', null, ...items),
+        stat(
+          'etiketlenen',
+          `${formatNumber(controller.labeledCount)} / ${formatNumber(controller.vertexCount)}` +
+            ` (%${((controller.labeledCount / Math.max(1, controller.vertexCount)) * 100).toFixed(0)})`,
+        ),
+      ];
 
       const active = controller.regions.find((region) => region.id === controller.activeRegionId);
       if (active) {
@@ -118,11 +138,21 @@ export function registerRegionSections(panel, controller) {
             ],
             (value) => controller.bindRegion(active.id, value),
           ),
+          active.boundBone
+            ? slider(
+                'sabitleme oranı',
+                active.strength ?? 1,
+                { min: 0, max: 1, step: 0.05 },
+                (value) => controller.setRegionStrength(active.id, value),
+              )
+            : null,
           element(
             'p',
             'hint',
-            'Seçilen kemik bu bölgenin tüm ağırlığını alır. Pelerin için Hips, ' +
-              'atkı için Neck, saç için Head tipik tercihler.',
+            'Seçilen kemik bu bölgenin ağırlığını alır. Pelerin için Hips, ' +
+              'atkı için Neck, saç için Head tipik tercihler. Oran 1 sert ' +
+              'sabitler ve parça sınırında kopma çizgisi bırakabilir; 0.6-0.8 ' +
+              'dikişi yumuşatır.',
           ),
         );
       }
