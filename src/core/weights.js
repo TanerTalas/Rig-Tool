@@ -28,6 +28,13 @@ export const DEFAULT_WEIGHT_OPTIONS = {
   epsilon: 1e-8,
   smoothIterations: 1,
   smoothStrength: 0.5,
+  // Mesafeyi kemik ekseninden değil, kemiğin uzuv yüzeyinden itibaren ölç.
+  radiusNormalization: true,
+  // Uzvun içinde kalan mesafeler için taban değer, yarıçapın katı olarak.
+  // İki uzuv da bir vertex'i içine alıyorsa ince olan kazansın diye yarıçapla
+  // orantılı. Küçültmek sızıntıyı azaltır ama eklemleri sertleştirir:
+  // 0.05'te ortalama etkileyen kemik 1.74'e, 0.35'te 2.46'ya çıkıyor.
+  radiusFloor: 0.2,
   // Çocuğu olmayan kemiklere verilen sanal kuyruğun, ebeveyn kemik uzunluğuna
   // oranı. Bu olmadan el/ayak/kafa ucu kemikleri hiçbir vertex'e hükmedemez.
   tailFactor: 0.6,
@@ -171,7 +178,50 @@ export function computeGeodesicWeights(geometry, skeleton, graph, options = {}) 
     nearestBone[v] = bestBone;
   }
 
-  // 2) Kemik başına seed listesi
+  // 2) Kemik yarıçapları ve seed listeleri
+  //
+  // Ham mesafe chibi modellerde yanlış cevap veriyor: gövdenin yan duvarı
+  // omurga ekseninden 9 cm uzakta ama yanına yapışmış kolun ekseninden
+  // 5 cm uzakta. İki ölçüye de göre "orası kol" çıkıyor, oysa orası gövde.
+  //
+  // Çözüm, mesafeyi kemik ekseninden değil o kemiğin uzuv YÜZEYİNDEN itibaren
+  // ölçmek: her kemiğin bir yarıçapı var (kol ~3 cm, gövde ~9 cm) ve gerçek
+  // soru "bu vertex hangi uzvun kabuğunun üstünde" sorusu.
+  //
+  //   d_etkin = max(d - yarıçap, 0) + FLOOR * yarıçap
+  //
+  // Gövde duvarı: gövde için d-r = 0, kol için 0.05-0.03 = 0.02 -> gövde kazanır.
+  // Kol yüzeyi:   kol için 0 -> kol kazanır.
+  // El:           el için 0, kalça için de d<r ama taban terimi kalçada daha
+  //               büyük (kalın kemik) olduğu için ince olan el kazanır.
+  //
+  // Mesafeyi yarıçapa BÖLMEK denendi ve işe yaramadı: kalın kemikler (kalça)
+  // uzaktaki vertex'leri de kendi yarıçapı içinde sayıp elin ağırlığını
+  // çalıyor, el %75 geriliyordu.
+  const radii = estimateBoneRadii(euclid, nearestBone, weldedCount, boneCount);
+  const normalize = options.radiusNormalization ?? DEFAULT_WEIGHT_OPTIONS.radiusNormalization;
+  const radiusFloor = options.radiusFloor ?? DEFAULT_WEIGHT_OPTIONS.radiusFloor;
+  const effective = (distance, bone) =>
+    normalize ? Math.max(distance - radii[bone], 0) + radiusFloor * radii[bone] : distance;
+
+  if (normalize) {
+    // Etkin mesafeye göre en yakın kemiği yeniden seç.
+    for (let v = 0; v < weldedCount; v += 1) {
+      let best = Infinity;
+      let bestBone = nearestBone[v];
+
+      for (let b = 0; b < boneCount; b += 1) {
+        const scaled = effective(euclid[v * boneCount + b], b);
+        if (scaled < best) {
+          best = scaled;
+          bestBone = b;
+        }
+      }
+
+      nearestBone[v] = bestBone;
+    }
+  }
+
   const seedNodes = Array.from({ length: boneCount }, () => []);
   const seedDistances = Array.from({ length: boneCount }, () => []);
 
@@ -208,7 +258,8 @@ export function computeGeodesicWeights(geometry, skeleton, graph, options = {}) 
       // yerlerde Öklid'in altına inebiliyor; bu kestirme, kol kemiğinin
       // gövdeye fazladan bulaşmasına yol açıyor. Alt sınır Öklid mesafesi.
       const distance = Math.max(relaxed, euclid[v * boneCount + b]);
-      dense[v * boneCount + b] = 1 / (Math.pow(distance, power) + epsilon);
+      const scaled = effective(distance, b);
+      dense[v * boneCount + b] = 1 / (Math.pow(scaled, power) + epsilon);
     }
   }
 
@@ -233,6 +284,42 @@ export function computeGeodesicWeights(geometry, skeleton, graph, options = {}) 
       elapsedMs: performance.now() - started,
     },
   });
+}
+
+/**
+ * Kemik yarıçapı: o kemiğin bölgesindeki vertex'lerin kemiğe medyan mesafesi.
+ *
+ * Medyan kullanılıyor çünkü ortalama, uzuv ucundaki birkaç uzak vertex yüzünden
+ * kayıyor. Bölgesi boş kalan kemikler için tüm yarıçapların medyanı yedek
+ * değer olarak veriliyor.
+ */
+function estimateBoneRadii(euclid, nearestBone, weldedCount, boneCount) {
+  const samples = Array.from({ length: boneCount }, () => []);
+
+  for (let v = 0; v < weldedCount; v += 1) {
+    const bone = nearestBone[v];
+    samples[bone].push(euclid[v * boneCount + bone]);
+  }
+
+  const radii = new Float64Array(boneCount);
+  const known = [];
+
+  for (let b = 0; b < boneCount; b += 1) {
+    if (!samples[b].length) continue;
+    samples[b].sort((a, c) => a - c);
+    const radius = samples[b][Math.floor(samples[b].length / 2)];
+    radii[b] = radius;
+    if (radius > 0) known.push(radius);
+  }
+
+  known.sort((a, b) => a - b);
+  const fallback = known.length ? known[Math.floor(known.length / 2)] : 1;
+
+  for (let b = 0; b < boneCount; b += 1) {
+    if (!(radii[b] > 0)) radii[b] = fallback;
+  }
+
+  return radii;
 }
 
 /**
