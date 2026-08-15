@@ -177,8 +177,154 @@ body {
   background: #232830;
 }
 
+.button--half {
+  width: auto;
+  flex: 1;
+}
+
+.button--danger:hover {
+  border-color: var(--danger);
+  color: #ffb4b4;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.button:disabled:hover {
+  background: #262b34;
+  border-color: var(--panel-border);
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+}
+
 .hint {
   margin: 8px 0 0;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+/* --------------------------------------------------------------- landmark */
+
+.prompt {
+  padding: 8px 10px;
+  background: rgba(255, 192, 67, 0.08);
+  border: 1px solid rgba(255, 192, 67, 0.35);
+  border-radius: var(--radius);
+}
+
+.prompt--done {
+  background: rgba(98, 224, 138, 0.08);
+  border-color: rgba(98, 224, 138, 0.35);
+  color: #9fe8b8;
+  font-size: 12px;
+}
+
+.prompt__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffd68a;
+}
+
+.prompt__hint {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox:hover {
+  color: var(--text);
+}
+
+.checkbox__input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.list--landmarks {
+  max-height: 320px;
+}
+
+.landmark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.landmark:hover {
+  background: #232830;
+  color: var(--text);
+}
+
+.landmark--active {
+  background: rgba(255, 192, 67, 0.12);
+  color: #ffd68a;
+}
+
+.landmark__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #3a4150;
+}
+
+.landmark__dot--set {
+  background: var(--accent);
+}
+
+.landmark__dot--auto {
+  background: var(--text-dim);
+}
+
+.landmark__label {
+  flex: 1;
+}
+
+.landmark__clear {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.landmark__clear:hover {
+  color: var(--danger);
+  background: #2f3540;
+}
+
+.status {
+  margin: 0;
+  font: var(--mono);
+}
+
+.status--ok {
+  color: #9fe8b8;
 }
