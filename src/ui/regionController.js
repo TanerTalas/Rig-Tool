@@ -193,6 +193,9 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     get regions() {
       return store.list;
     },
+    get store() {
+      return store;
+    },
     get activeRegionId() {
       return activeRegionId;
     },

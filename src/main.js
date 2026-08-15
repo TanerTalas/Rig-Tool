@@ -15,6 +15,8 @@ import { createWeightController } from './ui/weightController.js';
 import { registerDebugSections } from './ui/debugPanel.js';
 import { registerRegionSections } from './ui/regionPanel.js';
 import { createRegionController } from './ui/regionController.js';
+import { registerExportSections } from './ui/exportPanel.js';
+import { createExportController } from './ui/exportController.js';
 import { createDebugController } from './ui/debugController.js';
 import { createDebugView } from './ui/debugView.js';
 
@@ -84,15 +86,25 @@ const regions = createRegionController({
   onRefresh: () => panel.refresh(),
 });
 
+const exporter = createExportController({
+  landmarks,
+  weights,
+  regions,
+  getState: () => ({ ...state, baseMesh }),
+  onRefresh: () => panel.refresh(),
+});
+
 panel.addGroup({ id: 'rig', label: 'Rig', title: 'Model, landmark ve iskelet', available: () => Boolean(state.model) });
 panel.addGroup({ id: 'weight', label: 'Ağırlık', title: 'Weight, heatmap ve poz', available: () => weights.canCompute });
 panel.addGroup({ id: 'region', label: 'Bölge', title: 'Bölge etiketleme ve sabitleme', available: () => regions.isAvailable });
+panel.addGroup({ id: 'export', label: 'Export', title: 'GLB ve bağlam dosyaları', available: () => Boolean(state.model) });
 
 registerModelSections(panel, state);
 registerLandmarkSections(panel, landmarks);
 registerWeightSections(panel, weights);
 registerDebugSections(panel, debug);
 registerRegionSections(panel, regions);
+registerExportSections(panel, exporter);
 panel.refresh();
 
 const picker = createPicker({
@@ -120,6 +132,7 @@ if (import.meta.env.DEV) {
     weights,
     debug,
     regions,
+    exporter,
     get mesh() {
       return currentMesh;
     },
