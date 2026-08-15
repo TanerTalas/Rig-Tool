@@ -35,6 +35,11 @@ export const DEFAULT_WEIGHT_OPTIONS = {
   // orantılı. Küçültmek sızıntıyı azaltır ama eklemleri sertleştirir:
   // 0.05'te ortalama etkileyen kemik 1.74'e, 0.35'te 2.46'ya çıkıyor.
   radiusFloor: 0.2,
+  // Kemiğin "çekirdeği": bölgesindeki en yakın vertex'lerin oranı.
+  coreRatio: 0.3,
+  // Bir vertex'in seed olabilmesi için çekirdeğe yüzeyden uzaklığı,
+  // kemik yarıçapının kaç katına kadar olabilir.
+  seedReach: 4,
   // Çocuğu olmayan kemiklere verilen sanal kuyruğun, ebeveyn kemik uzunluğuna
   // oranı. Bu olmadan el/ayak/kafa ucu kemikleri hiçbir vertex'e hükmedemez.
   tailFactor: 0.6,
@@ -222,18 +227,64 @@ export function computeGeodesicWeights(geometry, skeleton, graph, options = {}) 
     }
   }
 
-  const seedNodes = Array.from({ length: boneCount }, () => []);
-  const seedDistances = Array.from({ length: boneCount }, () => []);
-
-  for (let v = 0; v < weldedCount; v += 1) {
-    const bone = nearestBone[v];
-    seedNodes[bone].push(v);
-    seedDistances[bone].push(euclid[v * boneCount + bone]);
-  }
-
-  // 3) Kemik başına çok kaynaklı Dijkstra -> yoğun ağırlık matrisi
+  // 3) Seed kümeleri
+  //
+  // Seed'i sadece "Öklid olarak en yakın kemik" diye seçmek yetmiyor: kolun
+  // yanında sarkan bir pelerin havada ele yakın olduğu için el kemiğinin
+  // seed'i oluyor ve elle birlikte savruluyor — oysa o pelerin yüzeyde
+  // elden 0.9 birim uzakta, kalçaya 0.4.
+  //
+  // Bu yüzden iki aşamalı seçim yapılıyor:
+  //   1. Çekirdek: kemiğin bölgesindeki, kemiğe en yakın %30'luk vertex'ler.
+  //      Bunlar kesinlikle o uzvun kendi yüzeyi.
+  //   2. Seed: bölgedeki vertex'lerden çekirdeğe YÜZEYDEN yakın olanlar.
+  //      Uzvun arka yüzü çevreyi dolaşarak da olsa çekirdeğe yakındır ve
+  //      seed olur; komşu duran ama bağlı olmayan kumaş elenir.
   const solver = createGeodesicSolver(graph);
   const distances = new Float64Array(weldedCount);
+  const coreDistances = new Float64Array(weldedCount);
+
+  const regions = Array.from({ length: boneCount }, () => []);
+  for (let v = 0; v < weldedCount; v += 1) regions[nearestBone[v]].push(v);
+
+  const seedNodes = Array.from({ length: boneCount }, () => []);
+  const seedDistances = Array.from({ length: boneCount }, () => []);
+  const coreRatio = options.coreRatio ?? DEFAULT_WEIGHT_OPTIONS.coreRatio;
+  const seedReach = options.seedReach ?? DEFAULT_WEIGHT_OPTIONS.seedReach;
+
+  for (let b = 0; b < boneCount; b += 1) {
+    const region = regions[b];
+    if (!region.length) continue;
+
+    const sorted = [...region].sort(
+      (a, c) => euclid[a * boneCount + b] - euclid[c * boneCount + b],
+    );
+    const coreCount = Math.max(1, Math.round(sorted.length * coreRatio));
+    const core = sorted.slice(0, coreCount);
+
+    solver.solve(
+      core,
+      core.map((v) => euclid[v * boneCount + b]),
+      coreDistances,
+    );
+
+    const limit = seedReach * radii[b];
+    for (const v of region) {
+      if (coreDistances[v] > limit) continue;
+      seedNodes[b].push(v);
+      seedDistances[b].push(euclid[v * boneCount + b]);
+    }
+
+    // Çekirdek her hâlükârda seed olmalı (limit çok dar kalırsa diye).
+    if (!seedNodes[b].length) {
+      for (const v of core) {
+        seedNodes[b].push(v);
+        seedDistances[b].push(euclid[v * boneCount + b]);
+      }
+    }
+  }
+
+  // 4) Kemik başına çok kaynaklı Dijkstra -> yoğun ağırlık matrisi
   let dense = new Float32Array(weldedCount * boneCount);
   const emptySeedBones = [];
   let unreachablePairs = 0;
