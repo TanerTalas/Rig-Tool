@@ -34,6 +34,8 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
   let selection = [];
   // 'spread' = tek tıkla yayılan seçim, 'path' = nokta nokta çizilen halka
   let mode = 'path';
+  let displayMode = 'points';
+  let pointSize = 0.006;
   let pathPoints = [];
   let pathVertices = [];
   let pathClosed = false;
@@ -119,6 +121,12 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     get mode() {
       return mode;
     },
+    get displayMode() {
+      return displayMode;
+    },
+    get pointSize() {
+      return pointSize;
+    },
     get pathPointCount() {
       return pathPoints.length;
     },
@@ -165,11 +173,25 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       if (enabled) {
         repaint();
         view.setOverlayEnabled(true);
+        view.setDisplayMode(displayMode);
+        view.setPointSize(pointSize);
       } else {
         view.setOverlayEnabled(false);
         view.clearColors();
       }
 
+      refresh();
+    },
+
+    setDisplayMode(value) {
+      displayMode = value;
+      view.setDisplayMode(value);
+      refresh();
+    },
+
+    setPointSize(value) {
+      pointSize = value;
+      view.setPointSize(value);
       refresh();
     },
 

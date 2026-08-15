@@ -32,6 +32,26 @@ export function registerRegionSections(panel, controller) {
 
       nodes.push(
         select(
+          'görünüm',
+          controller.displayMode,
+          [
+            { id: 'points', label: 'Noktalar' },
+            { id: 'wire', label: 'Tel kafes' },
+            { id: 'solid', label: 'Dolu yüzey' },
+          ],
+          (value) => controller.setDisplayMode(value),
+        ),
+      );
+
+      if (controller.displayMode === 'points') {
+        nodes.push(
+          slider('nokta boyutu', controller.pointSize, { min: 0.002, max: 0.02, step: 0.001, live: true },
+            (value) => controller.setPointSize(value)),
+        );
+      }
+
+      nodes.push(
+        select(
           'seçim yöntemi',
           controller.mode,
           [

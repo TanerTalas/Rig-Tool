@@ -59,7 +59,7 @@ const landmarks = createLandmarkController({
   onSkeletonChange: () => weights?.invalidate(),
 });
 
-const debugView = createDebugView();
+const debugView = createDebugView({ scene });
 
 const weights = createWeightController({
   landmarks,

@@ -27,15 +27,25 @@ const BASE_COLOR = '#9aa3b2';
 const SELECTION_COLOR = '#ffc043';
 const PATH_COLOR = '#ff4d6d';
 
-export function createDebugView() {
+export function createDebugView({ scene } = {}) {
   const heatmapMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true,
     side: THREE.DoubleSide,
   });
 
+  // Nokta bulutu: bölge seçerken sınırı görmek dolu yüzeyde zor, vertex'leri
+  // doğrudan görmek çok daha okunaklı.
+  const pointsMaterial = new THREE.PointsMaterial({
+    vertexColors: true,
+    size: 0.006,
+    sizeAttenuation: true,
+  });
+
   let mesh = null;
   let originalMaterial = null;
   let heatmapEnabled = false;
+  let points = null;
+  let displayMode = 'solid';
 
   function setMesh(nextMesh) {
     // Önceki mesh heatmap'te kalmışsa kendi material'ına geri döndür.
@@ -44,6 +54,54 @@ export function createDebugView() {
     mesh = nextMesh;
     originalMaterial = nextMesh?.material ?? null;
     heatmapEnabled = false;
+
+    disposePoints();
+    applyDisplayMode();
+  }
+
+  function disposePoints() {
+    if (!points) return;
+    scene?.remove(points);
+    points = null;
+  }
+
+  /**
+   * Görüntüleme modu.
+   *  solid  - dolu yüzey
+   *  wire   - tel kafes
+   *  points - vertex bulutu + yarı saydam gövde
+   *
+   * Nokta bulutu bind pose'daki konumları gösteriyor: THREE.Points kemik
+   * dönüşümü uygulamıyor, o yüzden poz verilmişken noktalar yerinde kalır.
+   * Etiketleme zaten bind pose'da yapıldığı için bu bir sorun değil.
+   */
+  function setDisplayMode(mode) {
+    displayMode = mode;
+    applyDisplayMode();
+  }
+
+  function applyDisplayMode() {
+    if (!mesh) return;
+
+    const material = heatmapEnabled ? heatmapMaterial : originalMaterial;
+    if (!material) return;
+
+    material.wireframe = displayMode === 'wire';
+    material.transparent = displayMode === 'points';
+    material.opacity = displayMode === 'points' ? 0.25 : 1;
+    material.depthWrite = displayMode !== 'points';
+    material.needsUpdate = true;
+
+    if (displayMode === 'points') {
+      if (!points && scene) {
+        points = new THREE.Points(mesh.geometry, pointsMaterial);
+        points.name = 'region-points';
+        points.renderOrder = 996;
+        scene.add(points);
+      }
+    } else {
+      disposePoints();
+    }
   }
 
   /**
@@ -95,6 +153,22 @@ export function createDebugView() {
 
     heatmapEnabled = enabled;
     mesh.material = enabled ? heatmapMaterial : originalMaterial;
+
+    // Kapanırken dolu görünüme dön: yarı saydam gövde ve noktalar bölge
+    // moduna ait, texture'lı görünümde kafa karıştırıyor.
+    if (!enabled) {
+      displayMode = 'solid';
+      disposePoints();
+      if (originalMaterial) {
+        originalMaterial.wireframe = false;
+        originalMaterial.transparent = false;
+        originalMaterial.opacity = 1;
+        originalMaterial.depthWrite = true;
+        originalMaterial.needsUpdate = true;
+      }
+    } else {
+      applyDisplayMode();
+    }
   }
 
   /**
@@ -156,8 +230,11 @@ export function createDebugView() {
   }
 
   function setWireframe(enabled) {
-    heatmapMaterial.wireframe = enabled;
-    if (originalMaterial) originalMaterial.wireframe = enabled;
+    setDisplayMode(enabled ? 'wire' : 'solid');
+  }
+
+  function setPointSize(size) {
+    pointsMaterial.size = size;
   }
 
   /**
@@ -176,7 +253,12 @@ export function createDebugView() {
     setHeatmapEnabled,
     setOverlayEnabled: setHeatmapEnabled,
     setWireframe,
+    setDisplayMode,
+    setPointSize,
     clearColors,
+    get displayMode() {
+      return displayMode;
+    },
     get isHeatmapEnabled() {
       return heatmapEnabled;
     },
