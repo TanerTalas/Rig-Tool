@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "name": "humanoid-basic",
+  "note": "Kemik isimleri Mixamo konvansiyonunu takip eder, boylece Mixamo animasyonlari SkeletonUtils.retargetClip ile bu rig'e uygulanabilir. Parmak kemigi yok: chibi modellerde parmak weight'i her zaman sorun cikariyor.",
+  "landmarks": [
+    {
+      "id": "hips",
+      "label": "Kalça merkezi",
+      "hint": "Kasığın hemen üstü, bacakların ayrıldığı yer",
+      "side": "center"
+    },
+    {
+      "id": "spine",
+      "label": "Bel",
+      "hint": "Kalça ile göğüs arası, gövdenin en dar yeri",
+      "side": "center"
+    },
+    {
+      "id": "spine1",
+      "label": "Göğüs",
+      "hint": "Göğüs kafesinin üst kısmı, koltuk altı hizası",
+      "side": "center"
+    },
+    {
+      "id": "neck",
+      "label": "Boyun tabanı",
+      "hint": "Omuzların arasında, boynun gövdeden çıktığı yer",
+      "side": "center"
+    },
+    {
+      "id": "head",
+      "label": "Kafa merkezi",
+      "hint": "Kulak hizası, kafanın döneceği nokta",
+      "side": "center"
+    },
+    {
+      "id": "headTop",
+      "label": "Kafa üstü",
+      "hint": "Saç dahil değil, kafatasının tepesi",
+      "side": "center"
+    },
+    {
+      "id": "leftClavicle",
+      "label": "Sol köprücük",
+      "hint": "Boynun sol yanı, omuza giden çıkıntının başlangıcı",
+      "side": "left",
+      "mirror": "rightClavicle"
+    },
+    {
+      "id": "leftShoulder",
+      "label": "Sol omuz eklemi",
+      "hint": "Kolun gövdeden ayrıldığı yuvarlak eklem",
+      "side": "left",
+      "mirror": "rightShoulder"
+    },
+    {
+      "id": "leftElbow",
+      "label": "Sol dirsek",
+      "hint": "Görünmüyorsa omuz ile bilek arasının tam ortasını işaretle",
+      "side": "left",
+      "mirror": "rightElbow"
+    },
+    {
+      "id": "leftWrist",
+      "label": "Sol bilek",
+      "hint": "Elin kola bağlandığı yer",
+      "side": "left",
+      "mirror": "rightWrist"
+    },
+    {
+      "id": "leftHip",
+      "label": "Sol kalça eklemi",
+      "hint": "Kalça merkezinin solu, bacağın döneceği nokta",
+      "side": "left",
+      "mirror": "rightHip"
+    },
+    {
+      "id": "leftKnee",
+      "label": "Sol diz",
+      "hint": "Görünmüyorsa kalça ile ayak bileği arasının ortasını işaretle",
+      "side": "left",
+      "mirror": "rightKnee"
+    },
+    {
+      "id": "leftAnkle",
+      "label": "Sol ayak bileği",
+      "hint": "Bacağın ayağa bağlandığı yer, taban değil",
+      "side": "left",
+      "mirror": "rightAnkle"
+    },
+    {
+      "id": "rightClavicle",
+      "label": "Sağ köprücük",
+      "hint": "Sol köprücüğün aynası",
+      "side": "right",
+      "mirrorOf": "leftClavicle"
+    },
+    {
+      "id": "rightShoulder",
+      "label": "Sağ omuz eklemi",
+      "hint": "Sol omzun aynası",
+      "side": "right",
+      "mirrorOf": "leftShoulder"
+    },
+    {
+      "id": "rightElbow",
+      "label": "Sağ dirsek",
+      "hint": "Sol dirseğin aynası",
+      "side": "right",
+      "mirrorOf": "leftElbow"
+    },
+    {
+      "id": "rightWrist",
+      "label": "Sağ bilek",
+      "hint": "Sol bileğin aynası",
+      "side": "right",
+      "mirrorOf": "leftWrist"
+    },
+    {
+      "id": "rightHip",
+      "label": "Sağ kalça eklemi",
+      "hint": "Sol kalçanın aynası",
+      "side": "right",
+      "mirrorOf": "leftHip"
+    },
+    {
+      "id": "rightKnee",
+      "label": "Sağ diz",
+      "hint": "Sol dizin aynası",
+      "side": "right",
+      "mirrorOf": "leftKnee"
+    },
+    {
+      "id": "rightAnkle",
+      "label": "Sağ ayak bileği",
+      "hint": "Sol ayak bileğinin aynası",
+      "side": "right",
+      "mirrorOf": "leftAnkle"
+    }
+  ],
+  "bones": [
+    { "name": "mixamorig:Hips", "parent": null, "landmark": "hips" },
+    { "name": "mixamorig:Spine", "parent": "mixamorig:Hips", "landmark": "spine" },
+    { "name": "mixamorig:Spine1", "parent": "mixamorig:Spine", "landmark": "spine1" },
+    { "name": "mixamorig:Neck", "parent": "mixamorig:Spine1", "landmark": "neck" },
+    { "name": "mixamorig:Head", "parent": "mixamorig:Neck", "landmark": "head" },
+    { "name": "mixamorig:HeadTop_End", "parent": "mixamorig:Head", "landmark": "headTop" },
+
+    { "name": "mixamorig:LeftShoulder", "parent": "mixamorig:Spine1", "landmark": "leftClavicle" },
+    { "name": "mixamorig:LeftArm", "parent": "mixamorig:LeftShoulder", "landmark": "leftShoulder" },
+    { "name": "mixamorig:LeftForeArm", "parent": "mixamorig:LeftArm", "landmark": "leftElbow" },
+    { "name": "mixamorig:LeftHand", "parent": "mixamorig:LeftForeArm", "landmark": "leftWrist" },
+
+    { "name": "mixamorig:RightShoulder", "parent": "mixamorig:Spine1", "landmark": "rightClavicle" },
+    { "name": "mixamorig:RightArm", "parent": "mixamorig:RightShoulder", "landmark": "rightShoulder" },
+    { "name": "mixamorig:RightForeArm", "parent": "mixamorig:RightArm", "landmark": "rightElbow" },
+    { "name": "mixamorig:RightHand", "parent": "mixamorig:RightForeArm", "landmark": "rightWrist" },
+
+    { "name": "mixamorig:LeftUpLeg", "parent": "mixamorig:Hips", "landmark": "leftHip" },
+    { "name": "mixamorig:LeftLeg", "parent": "mixamorig:LeftUpLeg", "landmark": "leftKnee" },
+    { "name": "mixamorig:LeftFoot", "parent": "mixamorig:LeftLeg", "landmark": "leftAnkle" },
+
+    { "name": "mixamorig:RightUpLeg", "parent": "mixamorig:Hips", "landmark": "rightHip" },
+    { "name": "mixamorig:RightLeg", "parent": "mixamorig:RightUpLeg", "landmark": "rightKnee" },
+    { "name": "mixamorig:RightFoot", "parent": "mixamorig:RightLeg", "landmark": "rightAnkle" }
+  ]
+}
