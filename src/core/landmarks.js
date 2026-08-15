@@ -12,6 +12,33 @@ export const guidedLandmarks = template.landmarks.filter((entry) => entry.side !
 
 const landmarkById = new Map(template.landmarks.map((entry) => [entry.id, entry]));
 
+// Gövdenin orta çizgisini tanımlayan merkez landmark'lar, aşağıdan yukarıya.
+export const SPINE_LANDMARKS = ['hips', 'spine', 'spine1', 'neck', 'head', 'headTop'];
+
+/**
+ * Gövde orta çizgisi: yerleşmiş merkez landmark'ların X ortalaması.
+ *
+ * Modeli bounding box'a göre ortaladığımız için x=0 gövdenin ortası olmak
+ * zorunda değil; saç, aksesuar veya asimetrik poz orta çizgiyi kaydırıyor.
+ * Kullanıcı merkez landmark'ları işaretlerken orta çizginin nerede olduğunu
+ * zaten söylüyor; aynalama ve sol/sağ denetimi bunu kullanıyor.
+ *
+ * @param {Map<string, THREE.Vector3>} positions
+ */
+export function estimateMidline(positions) {
+  let sum = 0;
+  let count = 0;
+
+  for (const id of SPINE_LANDMARKS) {
+    const point = positions.get(id);
+    if (!point) continue;
+    sum += point.x;
+    count += 1;
+  }
+
+  return count ? sum / count : 0;
+}
+
 /**
  * Landmark deposu.
  *
@@ -65,8 +92,10 @@ export function createLandmarkStore() {
       // Sol tarafın aynası, sadece karşı taraf boşsa ya da otomatik yerleştirilmişse.
       const mirrorId = entry.mirror;
       if (mirrorEnabled && mirrorId && (!positions.has(mirrorId) || autoPlaced.has(mirrorId))) {
+        // Ayna x=0'a göre değil, gövdenin orta çizgisine göre alınıyor.
+        const midline = estimateMidline(positions);
         const mirrored = position.clone();
-        mirrored.x *= -1;
+        mirrored.x = 2 * midline - position.x;
         setInternal(mirrorId, mirrored, true);
       }
 
@@ -103,6 +132,27 @@ export function createLandmarkStore() {
       positions.clear();
       autoPlaced.clear();
       notify();
+    },
+
+    /**
+     * İki landmark'ın konumunu takas eder.
+     * Sol/sağ karıştığında (denetimin yakaladığı en sık hata) tüm zinciri
+     * elle yeniden işaretlemek yerine tek hamlede düzeltmeye yarıyor.
+     */
+    swap(idA, idB) {
+      const a = positions.get(idA);
+      const b = positions.get(idB);
+      if (!a || !b) return false;
+
+      positions.set(idA, b);
+      positions.set(idB, a);
+      // Takastan sonra ikisi de kullanıcı kararı sayılıyor; aynalama bunları
+      // tekrar ezmemeli.
+      autoPlaced.delete(idA);
+      autoPlaced.delete(idB);
+
+      notify();
+      return true;
     },
 
     /** Sıradaki boş landmark; rehberli akış bunu takip ediyor. */
