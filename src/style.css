@@ -386,6 +386,32 @@ body {
   background: var(--panel-border);
 }
 
+/* Rampa debugView.js'teki RAMP ile aynı duraklarda olmalı. */
+.legend {
+  margin: 10px 0 8px;
+}
+
+.legend__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    rgb(13, 15, 64) 0%,
+    rgb(26, 115, 230) 25%,
+    rgb(38, 204, 89) 50%,
+    rgb(250, 217, 51) 75%,
+    rgb(230, 38, 38) 100%
+  );
+}
+
+.legend__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font: var(--mono);
+  color: var(--text-dim);
+}
+
 .issue {
   margin: 8px 0 0;
   padding: 7px 9px;

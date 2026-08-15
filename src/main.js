@@ -12,6 +12,9 @@ import { createLandmarkView } from './ui/landmarkView.js';
 import { createLandmarkController } from './ui/landmarkController.js';
 import { registerWeightSections } from './ui/weightPanel.js';
 import { createWeightController } from './ui/weightController.js';
+import { registerDebugSections } from './ui/debugPanel.js';
+import { createDebugController } from './ui/debugController.js';
+import { createDebugView } from './ui/debugView.js';
 
 // Model 1 birim yüksekliğe normalize edildiği için kamera ve grid ölçüleri
 // sabit kalabiliyor.
@@ -54,22 +57,41 @@ const landmarks = createLandmarkController({
   onSkeletonChange: () => weights?.invalidate(),
 });
 
+const debugView = createDebugView();
+
 const weights = createWeightController({
   landmarks,
   getBaseMesh: () => baseMesh,
   setSceneMesh: (mesh) => setSceneMesh(mesh),
+  onRefresh: () => panel.refresh(),
+  onWeightsChanged: () => debug?.onWeightsChanged(),
+});
+
+const debug = createDebugController({
+  view: debugView,
+  landmarks,
+  weights,
   onRefresh: () => panel.refresh(),
 });
 
 registerModelSections(panel, state);
 registerLandmarkSections(panel, landmarks);
 registerWeightSections(panel, weights);
+registerDebugSections(panel, debug);
 panel.refresh();
 
 const picker = createPicker({
   renderer,
   camera,
-  onPick: (hit) => landmarks.handlePick(hit),
+  // Tıklama önceliği: yerleştirilecek bir landmark varsa o kazanır, yoksa
+  // skinlenmiş modelde vertex incelemesine düşer.
+  onPick: (hit) => {
+    if (landmarks.activeId) {
+      landmarks.handlePick(hit);
+    } else if (debug.isAvailable) {
+      debug.handlePick(hit);
+    }
+  },
 });
 
 setupDragAndDrop();
@@ -151,6 +173,7 @@ function setSceneMesh(mesh) {
   currentMesh = mesh;
   scene.add(currentMesh);
   picker.setTarget(currentMesh);
+  debugView.setMesh(currentMesh);
 }
 
 function setModel(loaded) {

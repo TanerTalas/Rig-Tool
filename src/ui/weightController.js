@@ -14,7 +14,13 @@ import { applyTestPose } from '../core/pose.js';
  * eski iskelete bağlıdır. Bu yüzden iskelet değişince skinning iptal ediliyor
  * ve sahne ham mesh'e dönüyor.
  */
-export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, onRefresh }) {
+export function createWeightController({
+  landmarks,
+  getBaseMesh,
+  setSceneMesh,
+  onRefresh,
+  onWeightsChanged,
+}) {
   let power = DEFAULT_WEIGHT_OPTIONS.power;
   let weights = null;
   let stats = null;
@@ -75,6 +81,7 @@ export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, o
 
       poseId = 'bind';
       setSceneMesh(skinnedMesh);
+      onWeightsChanged?.();
       refresh();
 
       const dominant = [...stats.perBone]
@@ -107,6 +114,11 @@ export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, o
       refresh();
     },
 
+    /** Kullanıcı bir kemiği elle döndürdü: artık hazır pozlardan biri değiliz. */
+    markCustomPose() {
+      poseId = 'custom';
+    },
+
     /** İskelet değişti: mevcut skinning artık geçersiz. */
     invalidate() {
       if (!skinnedMesh) return;
@@ -121,6 +133,7 @@ export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, o
       if (mesh) setSceneMesh(mesh);
 
       console.warn('[weights] İskelet değişti, skinning sıfırlandı. Yeniden hesapla.');
+      onWeightsChanged?.();
       refresh();
     },
 
@@ -130,6 +143,7 @@ export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, o
       stats = null;
       leakage = null;
       poseId = 'bind';
+      onWeightsChanged?.();
       refresh();
     },
 

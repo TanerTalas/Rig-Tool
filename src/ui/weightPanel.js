@@ -75,7 +75,11 @@ export function registerWeightSections(panel, controller) {
         select(
           'poz',
           controller.poseId,
-          TEST_POSES.map((pose) => ({ id: pose.id, label: pose.label })),
+          // Kullanıcı kemikleri elle döndürdüyse hazır pozlardan biri değiliz;
+          // listede bunu gösteren geçici bir seçenek beliriyor.
+          controller.poseId === 'custom'
+            ? [{ id: 'custom', label: '(elle ayarlandı)' }, ...TEST_POSES]
+            : TEST_POSES.map((pose) => ({ id: pose.id, label: pose.label })),
           (value) => controller.setPose(value),
         ),
         button('Bind pose\'a dön', () => controller.setPose('bind'), {
