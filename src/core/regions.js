@@ -298,6 +298,28 @@ export function createRegionStore() {
       return regions.find((region) => region.id === id) ?? null;
     },
 
+    /**
+     * Mevcut bölgeyi günceller: rengi, bağlı kemiği ve sabitleme oranı korunur.
+     * Bölüştürme kuralı burada da geçerli ama bölge kendini kırpmıyor.
+     */
+    update(id, { name, vertices }) {
+      const region = this.get(id);
+      if (!region) return null;
+
+      if (vertices) {
+        const claimed = new Set(vertices);
+        for (const other of regions) {
+          if (other.id === id) continue;
+          const kept = Array.from(other.vertices).filter((v) => !claimed.has(v));
+          if (kept.length !== other.vertices.length) other.vertices = Uint32Array.from(kept);
+        }
+        region.vertices = Uint32Array.from(vertices);
+      }
+
+      if (name && name.trim()) region.name = name.trim();
+      return region;
+    },
+
     remove(id) {
       const index = regions.findIndex((region) => region.id === id);
       if (index >= 0) regions.splice(index, 1);

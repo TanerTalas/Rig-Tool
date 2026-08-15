@@ -76,6 +76,16 @@ export function registerRegionSections(panel, controller) {
               : 'Ayırmak istediğin parçanın çevresine sırayla tıkla; noktalar ' +
                 'yüzeydeki en kısa yolla birleşir. En az 3 nokta koyup halkayı kapat.',
           ),
+          select(
+            'yeni doldurma',
+            controller.combineMode,
+            [
+              { id: 'replace', label: 'Seçimi değiştir' },
+              { id: 'add', label: 'Seçime ekle' },
+              { id: 'subtract', label: 'Seçimden çıkar' },
+            ],
+            (value) => controller.setCombineMode(value),
+          ),
           row(
             button('Halkayı kapat ve doldur', () => controller.closePath(), {
               className: 'button button--half',
@@ -132,15 +142,26 @@ export function registerRegionSections(panel, controller) {
           button('Tersine çevir', () => controller.invert()),
           datalist,
           input,
+          controller.editingRegion
+            ? element(
+                'p',
+                'hint hint--edit',
+                `"${controller.editingRegion.name}" düzenleniyor. Kaydedince bu bölge ` +
+                  'güncellenir; ayrı bir bölge istiyorsan "Yeni bölge olarak kaydet".',
+              )
+            : null,
           row(
-            button('Kaydet', () => controller.saveRegion(input.value), {
-              className: 'button button--half',
-            }),
+            button(controller.editingRegion ? 'Güncelle' : 'Kaydet', () =>
+              controller.saveRegion(input.value), { className: 'button button--half' }),
             button('Temizle', () => {
               controller.clearSelection();
               controller.clearPath();
             }, { className: 'button button--half' }),
           ),
+          controller.editingRegion
+            ? button('Yeni bölge olarak kaydet', () =>
+                controller.saveRegion(input.value, { asNew: true }))
+            : null,
         );
       } else {
         nodes.push(element('p', 'list__empty', 'modele tıkla'));

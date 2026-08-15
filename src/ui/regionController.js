@@ -42,6 +42,11 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
   // Panel her değişimde yeniden çiziliyor; yazılan isim kontrolcüde
   // tutulmazsa her tıklamada siliniyor.
   let pendingName = '';
+  // Kayıtlı bir bölge düzenleniyorsa id'si; "Kaydet" yeni bölge açmak yerine
+  // bunu güncelliyor.
+  let editingRegionId = null;
+  // Yeni doldurma mevcut seçimle nasıl birleşsin.
+  let combineMode = 'replace';
   let maxDistance = DEFAULT_SELECTION.maxDistance;
   let maxAngle = DEFAULT_SELECTION.maxAngle;
   let activeRegionId = null;
@@ -102,6 +107,23 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     });
   }
 
+  /** Yeni doldurmayı mevcut seçimle birleştirir. */
+  function applyFill(filled) {
+    if (combineMode === 'add') {
+      const merged = new Set(selection);
+      for (const v of filled) merged.add(v);
+      selection = Array.from(merged);
+    } else if (combineMode === 'subtract') {
+      const removed = new Set(filled);
+      selection = selection.filter((v) => !removed.has(v));
+    } else {
+      selection = Array.from(filled);
+    }
+
+    repaint();
+    refresh();
+  }
+
   const controller = {
     /**
      * Etiketleme weight'e bağlı değil: parçaları adlandırmak modelin
@@ -149,6 +171,20 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     },
     get pendingName() {
       return pendingName;
+    },
+    get editingRegionId() {
+      return editingRegionId;
+    },
+    get editingRegion() {
+      return editingRegionId === null ? null : store.get(editingRegionId);
+    },
+    get combineMode() {
+      return combineMode;
+    },
+
+    setCombineMode(value) {
+      combineMode = value;
+      refresh();
     },
 
     setPendingName(value) {
@@ -256,24 +292,20 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
 
       if (otherSeed < 0) {
         // Halka kapanmamış: tek taraf var, tümü seçildi.
-        selection = Array.from(first);
+        applyFill(first);
         console.warn('[region] Halka meshi ikiye bölmüyor; seçim tüm modeli kapsıyor.');
       } else {
         const second = floodFillBounded(graph, otherSeed, barrier);
-        selection = Array.from(first.length <= second.length ? first : second);
+        applyFill(first.length <= second.length ? first : second);
       }
 
-      repaint();
-      refresh();
       console.log('[region] halka kapatıldı, küçük taraf seçildi:', selection.length, 'vertex');
     },
 
     /** Halkanın bir tarafını doldurur; tıklanan taraf seçilir. */
     fillFrom(welded) {
       if (!pathVertices.length) return;
-      selection = Array.from(floodFillBounded(graph, welded, new Set(pathVertices)));
-      repaint();
-      refresh();
+      applyFill(floodFillBounded(graph, welded, new Set(pathVertices)));
       console.log('[region] halka dolduruldu:', selection.length, 'vertex');
     },
 
@@ -360,15 +392,33 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     clearSelection() {
       seed = null;
       selection = [];
+      editingRegionId = null;
+      pendingName = '';
+      combineMode = 'replace';
       repaint();
       refresh();
     },
 
-    saveRegion(name) {
+    /**
+     * Seçimi kaydeder. Bir bölge düzenleniyorsa onu günceller, aksi halde
+     * yeni bölge açar.
+     */
+    saveRegion(name, { asNew = false } = {}) {
       if (!selection.length) return null;
+
+      if (editingRegionId !== null && !asNew) {
+        const updated = store.update(editingRegionId, { name: name ?? pendingName, vertices: selection });
+        controller.reapply();
+        repaint();
+        refresh();
+        console.log(`[region] "${updated.name}" güncellendi:`, updated.vertices.length, 'vertex');
+        return updated;
+      }
 
       const region = store.add({ name: name ?? pendingName, vertices: selection });
       pendingName = '';
+      editingRegionId = null;
+      combineMode = 'replace';
       activeRegionId = region.id;
       seed = null;
       selection = [];
@@ -387,15 +437,36 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       if (!region) return;
 
       activeRegionId = id;
+      editingRegionId = id;
+      pendingName = region.name;
       selection = Array.from(region.vertices);
       seed = null;
+      pathPoints = [];
+      pathVertices = [];
+      pathClosed = false;
+      // Düzenlemeye girerken varsayılan davranış eklemek: kullanıcı genelde
+      // bölgeyi büyütmek için geri dönüyor.
+      combineMode = 'add';
       repaint();
+      refresh();
+    },
+
+    /** Düzenlemeyi bırakır, sonraki kayıt yeni bölge açar. */
+    stopEditing() {
+      editingRegionId = null;
+      pendingName = '';
+      combineMode = 'replace';
       refresh();
     },
 
     removeRegion(id) {
       store.remove(id);
       if (activeRegionId === id) activeRegionId = null;
+      if (editingRegionId === id) {
+        editingRegionId = null;
+        pendingName = '';
+        selection = [];
+      }
       repaint();
       controller.reapply();
       refresh();
