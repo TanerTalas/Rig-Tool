@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { createGeodesicSolver } from './geodesic.js';
+
 /**
  * Naif skin weight hesabı (Aşama 2).
  *
@@ -24,6 +26,11 @@ const INFLUENCE_EPSILON = 0.01;
 export const DEFAULT_WEIGHT_OPTIONS = {
   power: 4,
   epsilon: 1e-8,
+  smoothIterations: 1,
+  smoothStrength: 0.5,
+  // Çocuğu olmayan kemiklere verilen sanal kuyruğun, ebeveyn kemik uzunluğuna
+  // oranı. Bu olmadan el/ayak/kafa ucu kemikleri hiçbir vertex'e hükmedemez.
+  tailFactor: 0.6,
 };
 
 /**
@@ -104,6 +111,251 @@ export function computeNaiveWeights(geometry, skeleton, options = {}) {
 }
 
 /**
+ * Geodezik weight hesabı (Aşama 4).
+ *
+ * Fark tek bir yerde: mesafe artık havadan değil, mesh yüzeyinde yürüyerek
+ * ölçülüyor. Bunun için her kemiğe bir seed kümesi veriliyor ve o seed'lerden
+ * yüzey boyunca yayılıyoruz.
+ *
+ * Seed seçimi: bir vertex, Öklid olarak en yakın olduğu kemiğin seed'i olur.
+ * Sabit bir mesafe eşiği kullanmıyoruz çünkü uzuv kalınlığı modelden modele
+ * ve uzuvdan uzva değişiyor — kalın bir uyluğun ekseni yüzeyden 5 cm içeride
+ * kalıyor ve sabit eşik hiç seed bulamıyor. Bu haliyle her kemik kendi
+ * bölgesini seed olarak alıyor, kapsama garanti.
+ *
+ * Bağlantısız adalar ayrı bir çözüm gerektirmiyor: her vertex kendi en yakın
+ * kemiğinin seed'i olduğu için ada içindeki vertex'ler o kemikten ağırlık
+ * alıyor, diğer kemiklere ise yüzeyden ulaşılamadığı için ağırlık sızmıyor.
+ *
+ * @param {THREE.BufferGeometry} geometry
+ * @param {THREE.Skeleton} skeleton bind pose'daki iskelet
+ * @param {object} graph adjacency.js'ten gelen komşuluk grafiği
+ * @param {object} [options]
+ */
+export function computeGeodesicWeights(geometry, skeleton, graph, options = {}) {
+  const power = options.power ?? DEFAULT_WEIGHT_OPTIONS.power;
+  const epsilon = options.epsilon ?? DEFAULT_WEIGHT_OPTIONS.epsilon;
+  const smoothIterations = options.smoothIterations ?? DEFAULT_WEIGHT_OPTIONS.smoothIterations;
+  const smoothStrength = options.smoothStrength ?? DEFAULT_WEIGHT_OPTIONS.smoothStrength;
+
+  const started = performance.now();
+  const bones = skeleton.bones;
+  const boneCount = bones.length;
+  const weldedCount = graph.weldedCount;
+
+  const boneSegments = buildBoneSegments(skeleton, {
+    tailFactor: options.tailFactor ?? DEFAULT_WEIGHT_OPTIONS.tailFactor,
+    facing: options.facing ?? 1,
+  });
+
+  // 1) Her welded vertex için her kemiğe Öklid mesafesi + en yakın kemik
+  const euclid = new Float32Array(weldedCount * boneCount);
+  const nearestBone = new Uint16Array(weldedCount);
+  const vertex = new THREE.Vector3();
+
+  for (let v = 0; v < weldedCount; v += 1) {
+    vertex.set(graph.positions[v * 3], graph.positions[v * 3 + 1], graph.positions[v * 3 + 2]);
+
+    let best = Infinity;
+    let bestBone = 0;
+
+    for (let b = 0; b < boneCount; b += 1) {
+      const distance = distanceToBone(vertex, boneSegments[b]);
+      euclid[v * boneCount + b] = distance;
+      if (distance < best) {
+        best = distance;
+        bestBone = b;
+      }
+    }
+
+    nearestBone[v] = bestBone;
+  }
+
+  // 2) Kemik başına seed listesi
+  const seedNodes = Array.from({ length: boneCount }, () => []);
+  const seedDistances = Array.from({ length: boneCount }, () => []);
+
+  for (let v = 0; v < weldedCount; v += 1) {
+    const bone = nearestBone[v];
+    seedNodes[bone].push(v);
+    seedDistances[bone].push(euclid[v * boneCount + bone]);
+  }
+
+  // 3) Kemik başına çok kaynaklı Dijkstra -> yoğun ağırlık matrisi
+  const solver = createGeodesicSolver(graph);
+  const distances = new Float64Array(weldedCount);
+  let dense = new Float32Array(weldedCount * boneCount);
+  const emptySeedBones = [];
+  let unreachablePairs = 0;
+
+  for (let b = 0; b < boneCount; b += 1) {
+    if (!seedNodes[b].length) {
+      emptySeedBones.push(bones[b].name);
+      continue;
+    }
+
+    solver.solve(seedNodes[b], seedDistances[b], distances);
+
+    for (let v = 0; v < weldedCount; v += 1) {
+      const relaxed = distances[v];
+      if (!Number.isFinite(relaxed)) {
+        unreachablePairs += 1;
+        continue; // ağırlık 0 kalıyor: bu kemiğe yüzeyden ulaşılamıyor
+      }
+
+      // Yüzeyden giden yol düz çizgiden kısa olamaz. Dijkstra "komşu seed'in
+      // Öklid mesafesi + kısa bir yüzey yürüyüşü" toplamını bulup omuz gibi
+      // yerlerde Öklid'in altına inebiliyor; bu kestirme, kol kemiğinin
+      // gövdeye fazladan bulaşmasına yol açıyor. Alt sınır Öklid mesafesi.
+      const distance = Math.max(relaxed, euclid[v * boneCount + b]);
+      dense[v * boneCount + b] = 1 / (Math.pow(distance, power) + epsilon);
+    }
+  }
+
+  // 4) Yumuşatma: komşuların ağırlıklarıyla karıştır
+  for (let i = 0; i < smoothIterations; i += 1) {
+    dense = smoothWeights(dense, graph, boneCount, smoothStrength);
+  }
+
+  // 5) En büyük 4'ü tut, normalize et, orijinal vertex'lere yay
+  return finalizeWeights({
+    dense,
+    graph,
+    geometry,
+    bones,
+    nearestBone,
+    method: 'geodesic',
+    stats: {
+      power,
+      smoothIterations,
+      emptySeedBones,
+      unreachablePairs,
+      elapsedMs: performance.now() - started,
+    },
+  });
+}
+
+/**
+ * Yoğun ağırlık matrisini komşu ortalamasıyla karıştırır (Laplacian).
+ * Kemik sınırlarındaki keskin geçişleri yumuşatıyor; deformasyonda
+ * "kırılma çizgisi" görünmesini engelliyor.
+ */
+function smoothWeights(dense, graph, boneCount, strength) {
+  const output = new Float32Array(dense.length);
+
+  for (let v = 0; v < graph.weldedCount; v += 1) {
+    const start = graph.neighborOffsets[v];
+    const end = graph.neighborOffsets[v + 1];
+    const degree = end - start;
+    const base = v * boneCount;
+
+    if (degree === 0) {
+      output.set(dense.subarray(base, base + boneCount), base);
+      continue;
+    }
+
+    for (let b = 0; b < boneCount; b += 1) {
+      let sum = 0;
+      for (let i = start; i < end; i += 1) {
+        sum += dense[graph.neighborIndices[i] * boneCount + b];
+      }
+      const average = sum / degree;
+      output[base + b] = dense[base + b] * (1 - strength) + average * strength;
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Yoğun matristen skinIndex/skinWeight üretir.
+ * Welded vertex'lerin ağırlıkları, aynı konumdaki tüm orijinal vertex'lere
+ * kopyalanıyor: dikiş kopyaları aynı ağırlığı almalı, yoksa UV seam'inde
+ * mesh yırtılır.
+ */
+function finalizeWeights({ dense, graph, geometry, bones, nearestBone, method, stats }) {
+  const boneCount = bones.length;
+  const vertexCount = geometry.getAttribute('position').count;
+
+  const skinIndices = new Uint16Array(vertexCount * MAX_INFLUENCES);
+  const skinWeights = new Float32Array(vertexCount * MAX_INFLUENCES);
+
+  const dominantCount = new Uint32Array(boneCount);
+  const influencedCount = new Uint32Array(boneCount);
+  let influenceSum = 0;
+  let fallbackVertices = 0;
+
+  const weldedIndices = new Uint16Array(MAX_INFLUENCES * graph.weldedCount);
+  const weldedWeights = new Float32Array(MAX_INFLUENCES * graph.weldedCount);
+
+  const row = new Float64Array(boneCount);
+
+  for (let v = 0; v < graph.weldedCount; v += 1) {
+    const base = v * boneCount;
+    for (let b = 0; b < boneCount; b += 1) row[b] = dense[base + b];
+
+    const picked = pickTopValues(row);
+    let total = 0;
+    for (let i = 0; i < picked.count; i += 1) total += picked.weights[i];
+
+    // Hiçbir kemiğe ulaşamayan vertex (kopuk ada, izole vertex): en yakın
+    // kemiğe %100 bağlanıyor.
+    if (total <= 0) {
+      fallbackVertices += 1;
+      weldedIndices[v * MAX_INFLUENCES] = nearestBone[v];
+      weldedWeights[v * MAX_INFLUENCES] = 1;
+      continue;
+    }
+
+    for (let i = 0; i < MAX_INFLUENCES; i += 1) {
+      const slot = v * MAX_INFLUENCES + i;
+      weldedIndices[slot] = i < picked.count ? picked.indices[i] : 0;
+      weldedWeights[slot] = i < picked.count ? picked.weights[i] / total : 0;
+    }
+  }
+
+  for (let v = 0; v < vertexCount; v += 1) {
+    const welded = graph.originalToWelded[v];
+
+    for (let i = 0; i < MAX_INFLUENCES; i += 1) {
+      const from = welded * MAX_INFLUENCES + i;
+      const to = v * MAX_INFLUENCES + i;
+      const bone = weldedIndices[from];
+      const weight = weldedWeights[from];
+
+      skinIndices[to] = bone;
+      skinWeights[to] = weight;
+
+      if (weight >= INFLUENCE_EPSILON) {
+        influencedCount[bone] += 1;
+        influenceSum += 1;
+      }
+    }
+
+    if (skinWeights[v * MAX_INFLUENCES] > 0) dominantCount[skinIndices[v * MAX_INFLUENCES]] += 1;
+  }
+
+  return {
+    skinIndices,
+    skinWeights,
+    stats: {
+      method,
+      vertexCount,
+      weldedCount: graph.weldedCount,
+      boneCount,
+      fallbackVertices,
+      avgInfluences: vertexCount ? influenceSum / vertexCount : 0,
+      perBone: bones.map((bone, index) => ({
+        name: bone.name,
+        dominant: dominantCount[index],
+        influenced: influencedCount[index],
+      })),
+      ...stats,
+    },
+  };
+}
+
+/**
  * Hesaplanan ağırlıkları geometry'ye yazar ve SkinnedMesh üretir.
  *
  * Sıra önemli: kemik hiyerarşisi mesh'e eklendikten sonra bind çağrılıyor.
@@ -118,7 +370,16 @@ export function applySkinning({ geometry, material, skeleton, root, weights, nam
   const skinnedMesh = new THREE.SkinnedMesh(geometry, material);
   skinnedMesh.name = name ?? 'skinned-model';
   skinnedMesh.add(root);
-  skinnedMesh.bind(skeleton);
+  skinnedMesh.updateMatrixWorld(true);
+
+  // bindMatrix MUTLAKA açıkça verilmeli. Three.js'te bind(skeleton) tek
+  // argümanla çağrılırsa içeride calculateInverses() çalışır ve o anki
+  // duruşu bind pose kabul eder. Model poz verilmişken weight yeniden
+  // hesaplanırsa o poz kalıcı bind pose olur: iskelet doğru görünür ama
+  // hiçbir kemik mesh'i hareket ettirmez, export edilen GLB de bükülür.
+  // Inverse bind matrix'ler iskelet kurulurken (bind pose'da) hesaplandı,
+  // burada tekrar hesaplanmamalı.
+  skinnedMesh.bind(skeleton, skinnedMesh.matrixWorld);
 
   return skinnedMesh;
 }
@@ -135,7 +396,10 @@ export function applySkinning({ geometry, material, skeleton, root, weights, nam
  * pose dünya matrisidir. Böylece model o an poz verilmiş olsa bile weight
  * hesabı doğru uzayda yapılır.
  */
-function buildBoneSegments(skeleton) {
+function buildBoneSegments(skeleton, options = {}) {
+  const tailFactor = options.tailFactor ?? 0;
+  const facing = options.facing ?? 1;
+
   const bones = skeleton.bones;
   const indexOf = new Map(bones.map((bone, index) => [bone, index]));
 
@@ -154,9 +418,44 @@ function buildBoneSegments(skeleton) {
       segments.push({ start, end: bindPositions[childIndex] });
     }
 
-    if (!segments.length) segments.push({ start, end: start });
+    if (segments.length) return segments;
+
+    // Uç kemik (el, ayak, kafa ucu): çocuğu yok, dolayısıyla gövdesi de yok.
+    // Kuyruk verilmezse etki alanı tek nokta olur, o nokta da ebeveyn
+    // segmentinin ucuyla çakıştığı için kemik hiçbir vertex'e hükmedemez.
+    const tail = tailDirection(bone, index, bindPositions, indexOf, facing);
+    if (!tail || tailFactor <= 0) {
+      segments.push({ start, end: start });
+      return segments;
+    }
+
+    segments.push({ start, end: start.clone().addScaledVector(tail.direction, tail.length * tailFactor) });
     return segments;
   });
+}
+
+/**
+ * Uç kemiğin sanal kuyruğunun yönü ve ölçüsü.
+ *
+ * Genel kural: kuyruk, ebeveynden bu kemiğe gelen yönde devam eder — el ön
+ * kolun devamıdır. Ayak bunun istisnası: baldır dikey iner ama ayak ileri
+ * uzanır, o yüzden modelin baktığı yön kullanılıyor. Bu ayrım olmadan ayak
+ * kemiği bacağın içine doğru uzar ve topuk-parmak yuvarlanması hiç çalışmaz.
+ */
+function tailDirection(bone, index, bindPositions, indexOf, facing) {
+  const parentIndex = indexOf.get(bone.parent);
+  if (parentIndex === undefined) return null;
+
+  const start = bindPositions[index];
+  const parent = bindPositions[parentIndex];
+  const length = start.distanceTo(parent);
+  if (length < 1e-6) return null;
+
+  if (/Foot$/.test(bone.name)) {
+    return { direction: new THREE.Vector3(0, 0, facing >= 0 ? 1 : -1), length };
+  }
+
+  return { direction: start.clone().sub(parent).normalize(), length };
 }
 
 // Sızıntı ölçümünde kullanılan kemik grupları.
@@ -247,27 +546,52 @@ function distanceToSegment(point, start, end) {
 
 /** En küçük mesafeli 4 kemiği ağırlığa çevirir, büyükten küçüğe sıralı. */
 function pickTopBones(distances, power, epsilon) {
-  const indices = new Uint16Array(MAX_INFLUENCES);
-  const weights = new Float64Array(MAX_INFLUENCES);
-  let count = 0;
+  const picked = resetPicked();
 
   for (let b = 0; b < distances.length; b += 1) {
-    const weight = 1 / (Math.pow(distances[b], power) + epsilon);
-
-    // Sıralı ekleme: liste 4 elemanlı, sıralamak için ayrı bir geçiş gereksiz.
-    let slot = count < MAX_INFLUENCES ? count : MAX_INFLUENCES - 1;
-    if (count === MAX_INFLUENCES && weight <= weights[slot]) continue;
-
-    while (slot > 0 && weights[slot - 1] < weight) {
-      weights[slot] = weights[slot - 1];
-      indices[slot] = indices[slot - 1];
-      slot -= 1;
-    }
-
-    weights[slot] = weight;
-    indices[slot] = b;
-    if (count < MAX_INFLUENCES) count += 1;
+    insertTop(picked, b, 1 / (Math.pow(distances[b], power) + epsilon));
   }
 
-  return { indices, weights, count };
+  return picked;
+}
+
+/** Hazır ağırlık dizisinden en büyük 4'ünü seçer (geodezik yol bunu kullanıyor). */
+function pickTopValues(values) {
+  const picked = resetPicked();
+
+  for (let b = 0; b < values.length; b += 1) {
+    if (values[b] <= 0) continue;
+    insertTop(picked, b, values[b]);
+  }
+
+  return picked;
+}
+
+// Tek bir tampon yeniden kullanılıyor: vertex başına iki dizi ayırmak
+// 8000 vertex'te fark ediyor.
+const pickedBuffer = {
+  indices: new Uint16Array(MAX_INFLUENCES),
+  weights: new Float64Array(MAX_INFLUENCES),
+  count: 0,
+};
+
+function resetPicked() {
+  pickedBuffer.count = 0;
+  return pickedBuffer;
+}
+
+/** Sıralı ekleme: liste 4 elemanlı, ayrı bir sıralama geçişi gereksiz. */
+function insertTop(picked, index, weight) {
+  let slot = picked.count < MAX_INFLUENCES ? picked.count : MAX_INFLUENCES - 1;
+  if (picked.count === MAX_INFLUENCES && weight <= picked.weights[slot]) return;
+
+  while (slot > 0 && picked.weights[slot - 1] < weight) {
+    picked.weights[slot] = picked.weights[slot - 1];
+    picked.indices[slot] = picked.indices[slot - 1];
+    slot -= 1;
+  }
+
+  picked.weights[slot] = weight;
+  picked.indices[slot] = index;
+  if (picked.count < MAX_INFLUENCES) picked.count += 1;
 }
