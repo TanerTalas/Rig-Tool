@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.glb binary
+*.fbx binary
+*.bin binary
