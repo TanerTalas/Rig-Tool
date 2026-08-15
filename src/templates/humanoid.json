@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "humanoid-basic",
-  "note": "Kemik isimleri Mixamo konvansiyonunu takip eder, boylece Mixamo animasyonlari SkeletonUtils.retargetClip ile bu rig'e uygulanabilir. Parmak kemigi yok: chibi modellerde parmak weight'i her zaman sorun cikariyor.",
+  "note": "Kemik isimleri yaygin humanoid konvansiyonu (Hips/Spine/LeftArm...). Parmak kemigi yok: chibi modellerde parmak weight'i her zaman sorun cikariyor.",
   "landmarks": [
     {
       "id": "hips",
@@ -139,29 +139,29 @@
     }
   ],
   "bones": [
-    { "name": "mixamorig:Hips", "parent": null, "landmark": "hips" },
-    { "name": "mixamorig:Spine", "parent": "mixamorig:Hips", "landmark": "spine" },
-    { "name": "mixamorig:Spine1", "parent": "mixamorig:Spine", "landmark": "spine1" },
-    { "name": "mixamorig:Neck", "parent": "mixamorig:Spine1", "landmark": "neck" },
-    { "name": "mixamorig:Head", "parent": "mixamorig:Neck", "landmark": "head" },
-    { "name": "mixamorig:HeadTop_End", "parent": "mixamorig:Head", "landmark": "headTop" },
+    { "name": "Hips", "parent": null, "landmark": "hips" },
+    { "name": "Spine", "parent": "Hips", "landmark": "spine" },
+    { "name": "Spine1", "parent": "Spine", "landmark": "spine1" },
+    { "name": "Neck", "parent": "Spine1", "landmark": "neck" },
+    { "name": "Head", "parent": "Neck", "landmark": "head" },
+    { "name": "HeadTop", "parent": "Head", "landmark": "headTop" },
 
-    { "name": "mixamorig:LeftShoulder", "parent": "mixamorig:Spine1", "landmark": "leftClavicle" },
-    { "name": "mixamorig:LeftArm", "parent": "mixamorig:LeftShoulder", "landmark": "leftShoulder" },
-    { "name": "mixamorig:LeftForeArm", "parent": "mixamorig:LeftArm", "landmark": "leftElbow" },
-    { "name": "mixamorig:LeftHand", "parent": "mixamorig:LeftForeArm", "landmark": "leftWrist" },
+    { "name": "LeftShoulder", "parent": "Spine1", "landmark": "leftClavicle" },
+    { "name": "LeftArm", "parent": "LeftShoulder", "landmark": "leftShoulder" },
+    { "name": "LeftForeArm", "parent": "LeftArm", "landmark": "leftElbow" },
+    { "name": "LeftHand", "parent": "LeftForeArm", "landmark": "leftWrist" },
 
-    { "name": "mixamorig:RightShoulder", "parent": "mixamorig:Spine1", "landmark": "rightClavicle" },
-    { "name": "mixamorig:RightArm", "parent": "mixamorig:RightShoulder", "landmark": "rightShoulder" },
-    { "name": "mixamorig:RightForeArm", "parent": "mixamorig:RightArm", "landmark": "rightElbow" },
-    { "name": "mixamorig:RightHand", "parent": "mixamorig:RightForeArm", "landmark": "rightWrist" },
+    { "name": "RightShoulder", "parent": "Spine1", "landmark": "rightClavicle" },
+    { "name": "RightArm", "parent": "RightShoulder", "landmark": "rightShoulder" },
+    { "name": "RightForeArm", "parent": "RightArm", "landmark": "rightElbow" },
+    { "name": "RightHand", "parent": "RightForeArm", "landmark": "rightWrist" },
 
-    { "name": "mixamorig:LeftUpLeg", "parent": "mixamorig:Hips", "landmark": "leftHip" },
-    { "name": "mixamorig:LeftLeg", "parent": "mixamorig:LeftUpLeg", "landmark": "leftKnee" },
-    { "name": "mixamorig:LeftFoot", "parent": "mixamorig:LeftLeg", "landmark": "leftAnkle" },
+    { "name": "LeftUpLeg", "parent": "Hips", "landmark": "leftHip" },
+    { "name": "LeftLeg", "parent": "LeftUpLeg", "landmark": "leftKnee" },
+    { "name": "LeftFoot", "parent": "LeftLeg", "landmark": "leftAnkle" },
 
-    { "name": "mixamorig:RightUpLeg", "parent": "mixamorig:Hips", "landmark": "rightHip" },
-    { "name": "mixamorig:RightLeg", "parent": "mixamorig:RightUpLeg", "landmark": "rightKnee" },
-    { "name": "mixamorig:RightFoot", "parent": "mixamorig:RightLeg", "landmark": "rightAnkle" }
+    { "name": "RightUpLeg", "parent": "Hips", "landmark": "rightHip" },
+    { "name": "RightLeg", "parent": "RightUpLeg", "landmark": "rightKnee" },
+    { "name": "RightFoot", "parent": "RightLeg", "landmark": "rightAnkle" }
   ]
 }

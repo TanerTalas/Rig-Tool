@@ -80,7 +80,7 @@ export function createWeightController({ landmarks, getBaseMesh, setSceneMesh, o
       const dominant = [...stats.perBone]
         .sort((a, b) => b.dominant - a.dominant)
         .slice(0, 5)
-        .map((entry) => `${entry.name.replace('mixamorig:', '')}=${entry.dominant}`);
+        .map((entry) => `${entry.name}=${entry.dominant}`);
 
       console.log('[weights] naif weight hesaplandı:', {
         power,

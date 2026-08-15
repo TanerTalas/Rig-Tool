@@ -23,8 +23,8 @@ export const TEST_POSES = [
     // Karakter +Z'ye bakıyor, solu +X. Sol kolu kaldırmak için +Z ekseninde
     // pozitif, sağ kol için negatif dönüş gerekiyor.
     rotations: {
-      'mixamorig:LeftArm': { z: 60 * DEGREE },
-      'mixamorig:RightArm': { z: -60 * DEGREE },
+      'LeftArm': { z: 60 * DEGREE },
+      'RightArm': { z: -60 * DEGREE },
     },
   },
   {
@@ -32,16 +32,16 @@ export const TEST_POSES = [
     label: 'Dizleri bük',
     // Diz geriye bükülür; karakter +Z'ye baktığı için baldır -Z'ye gider.
     rotations: {
-      'mixamorig:LeftLeg': { x: 70 * DEGREE },
-      'mixamorig:RightLeg': { x: 70 * DEGREE },
+      'LeftLeg': { x: 70 * DEGREE },
+      'RightLeg': { x: 70 * DEGREE },
     },
   },
   {
     id: 'twistSpine',
     label: 'Gövdeyi döndür',
     rotations: {
-      'mixamorig:Spine1': { y: 45 * DEGREE },
-      'mixamorig:Neck': { y: -20 * DEGREE },
+      'Spine1': { y: 45 * DEGREE },
+      'Neck': { y: -20 * DEGREE },
     },
   },
 ];

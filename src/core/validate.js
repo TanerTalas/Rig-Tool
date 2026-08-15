@@ -7,9 +7,8 @@ import { estimateMidline, humanoidTemplate, SPINE_LANDMARKS } from './landmarks.
  *
  * Neden gerekiyor: yanlış yerleştirilmiş bir landmark seti gözle bakınca
  * doğru görünebiliyor. Sol kol ile sağ kol yer değiştirmişse iskelet yine
- * makul bir insansı iskelet gibi çizilir, hata ancak Aşama 6'da Mixamo
- * animasyonu yanlış kolu oynatınca fark edilir. Bu modül o tür hataları
- * sayısal olarak yakalıyor.
+ * makul bir insansı iskelet gibi çizilir, hata ancak animasyon yanlış kolu
+ * oynatınca fark edilir. Bu modül o tür hataları sayısal olarak yakalıyor.
  *
  * Seviyeler:
  * - error: iskelet bu haliyle kullanılamaz
@@ -166,7 +165,7 @@ function checkSides(positions, info, issues) {
         `${groupLabel(group)}: sol ve sağ yer değiştirmiş. Model ` +
         `${info.facing.direction > 0 ? '+Z' : '-Z'} yönüne bakıyor, ` +
         `bu durumda modelin solu ${info.facing.direction > 0 ? '+X' : '-X'} tarafı. ` +
-        'Mixamo animasyonu bu haliyle ters uzvu oynatır.',
+        'Animasyon bu haliyle ters uzvu oynatır.',
     });
   }
 }
@@ -207,7 +206,7 @@ function checkBoneLengths(positions, info, issues) {
       issues.push({
         level: 'error',
         code: `zero-length-${bone.name}`,
-        message: `${bone.name.replace('mixamorig:', '')} kemiği neredeyse sıfır uzunlukta.`,
+        message: `${bone.name} kemiği neredeyse sıfır uzunlukta.`,
       });
     }
   }
