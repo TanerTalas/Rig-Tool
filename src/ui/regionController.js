@@ -39,6 +39,9 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
   let pathPoints = [];
   let pathVertices = [];
   let pathClosed = false;
+  // Panel her değişimde yeniden çiziliyor; yazılan isim kontrolcüde
+  // tutulmazsa her tıklamada siliniyor.
+  let pendingName = '';
   let maxDistance = DEFAULT_SELECTION.maxDistance;
   let maxAngle = DEFAULT_SELECTION.maxAngle;
   let activeRegionId = null;
@@ -100,8 +103,16 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
   }
 
   const controller = {
+    /**
+     * Etiketleme weight'e bağlı değil: parçaları adlandırmak modelin
+     * geometrisiyle ilgili bir iş, iskelet kurulmadan da yapılabilir.
+     * Kemiğe sabitleme ise ağırlıklar hesaplandıktan sonra anlam kazanıyor.
+     */
     get isAvailable() {
-      return Boolean(graph && weights.isSkinned);
+      return Boolean(graph);
+    },
+    get canBind() {
+      return Boolean(weights.isSkinned && landmarks.skeleton);
     },
     get enabled() {
       return enabled;
@@ -135,6 +146,13 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     },
     get pathClosed() {
       return pathClosed;
+    },
+    get pendingName() {
+      return pendingName;
+    },
+
+    setPendingName(value) {
+      pendingName = value;
     },
     get regions() {
       return store.list;
@@ -202,13 +220,52 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
       refresh();
     },
 
-    /** Halkayı kapatır: son nokta ilk noktaya bağlanır. */
+    /**
+     * Halkayı kapatır ve küçük tarafı otomatik doldurur.
+     *
+     * Bir parçanın çevresine halka çizen kullanıcı neredeyse her zaman o
+     * parçayı istiyor, yani küçük tarafı. Yanlış tahmin edersek "Tersine
+     * çevir" tek tıklık.
+     */
     closePath() {
       if (pathPoints.length < 3) return;
       pathClosed = true;
       rebuildPath();
+      controller.fillSmallerSide();
+      refresh();
+    },
+
+    /** Halkanın iki tarafını da hesaplayıp küçük olanı seçer. */
+    fillSmallerSide() {
+      if (!pathVertices.length) return;
+
+      const barrier = new Set(pathVertices);
+      let seed = -1;
+      for (let v = 0; v < graph.weldedCount; v += 1) {
+        if (!barrier.has(v)) { seed = v; break; }
+      }
+      if (seed < 0) return;
+
+      const first = floodFillBounded(graph, seed, barrier);
+      const firstSet = new Set(first);
+
+      let otherSeed = -1;
+      for (let v = 0; v < graph.weldedCount; v += 1) {
+        if (!firstSet.has(v) && !barrier.has(v)) { otherSeed = v; break; }
+      }
+
+      if (otherSeed < 0) {
+        // Halka kapanmamış: tek taraf var, tümü seçildi.
+        selection = Array.from(first);
+        console.warn('[region] Halka meshi ikiye bölmüyor; seçim tüm modeli kapsıyor.');
+      } else {
+        const second = floodFillBounded(graph, otherSeed, barrier);
+        selection = Array.from(first.length <= second.length ? first : second);
+      }
+
       repaint();
       refresh();
+      console.log('[region] halka kapatıldı, küçük taraf seçildi:', selection.length, 'vertex');
     },
 
     /** Halkanın bir tarafını doldurur; tıklanan taraf seçilir. */
@@ -310,7 +367,8 @@ export function createRegionController({ view, landmarks, weights, onRefresh }) 
     saveRegion(name) {
       if (!selection.length) return null;
 
-      const region = store.add({ name, vertices: selection });
+      const region = store.add({ name: name ?? pendingName, vertices: selection });
+      pendingName = '';
       activeRegionId = region.id;
       seed = null;
       selection = [];

@@ -70,13 +70,14 @@ export function registerRegionSections(panel, controller) {
             'p',
             'hint',
             controller.pathClosed
-              ? 'Halka kapalı. Şimdi istediğin tarafa tıkla, o taraf dolar. ' +
-                'Yanlış taraf dolduysa "Tersine çevir".'
+              ? 'Halka kapalı ve küçük taraf seçildi. Yanlış tarafsa "Tersine çevir", ' +
+                'başka bir bölge istiyorsan modele tıklayarak o tarafı doldur. ' +
+                'Sonra aşağıdan isim verip kaydet.'
               : 'Ayırmak istediğin parçanın çevresine sırayla tıkla; noktalar ' +
                 'yüzeydeki en kısa yolla birleşir. En az 3 nokta koyup halkayı kapat.',
           ),
           row(
-            button('Halkayı kapat', () => controller.closePath(), {
+            button('Halkayı kapat ve doldur', () => controller.closePath(), {
               className: 'button button--half',
               disabled: controller.pathPointCount < 3 || controller.pathClosed,
             }),
@@ -118,6 +119,10 @@ export function registerRegionSections(panel, controller) {
         input.type = 'text';
         input.placeholder = 'bölge adı (Atkı, Sol El, ...)';
         input.setAttribute('list', listId);
+        input.value = controller.pendingName;
+        // Yazılan isim kontrolcüde saklanıyor: panel yeniden çizilince
+        // kaybolmasın.
+        input.addEventListener('input', () => controller.setPendingName(input.value));
         input.addEventListener('keydown', (event) => {
           if (event.key === 'Enter') controller.saveRegion(input.value);
         });
@@ -188,7 +193,19 @@ export function registerRegionSections(panel, controller) {
       ];
 
       const active = controller.regions.find((region) => region.id === controller.activeRegionId);
-      if (active) {
+      if (active && !controller.canBind) {
+        nodes.push(
+          element('div', 'divider', null),
+          element(
+            'p',
+            'hint',
+            'Kemiğe sabitleme için önce Ağırlık sekmesinden weight hesapla. ' +
+              'Etiketleme şimdiden yapılabilir, sabitleme sonradan eklenir.',
+          ),
+        );
+      }
+
+      if (active && controller.canBind) {
         nodes.push(
           element('div', 'divider', null),
           select(
