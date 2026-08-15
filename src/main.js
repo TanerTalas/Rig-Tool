@@ -3,8 +3,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { loadGLB } from './core/loader.js';
 import { buildAdjacency } from './core/adjacency.js';
+import { readJSONFile } from './core/annotations.js';
 import { createPicker } from './ui/picker.js';
 import { createPanel } from './ui/panel.js';
+import { registerModelSections } from './ui/modelPanel.js';
+import { registerLandmarkSections } from './ui/landmarkPanel.js';
+import { createLandmarkView } from './ui/landmarkView.js';
+import { createLandmarkController } from './ui/landmarkController.js';
 
 // Model 1 birim yüksekliğe normalize edildiği için kamera ve grid ölçüleri
 // sabit kalabiliyor.
@@ -12,7 +17,6 @@ const MODEL_HEIGHT = 1;
 
 const canvas = document.getElementById('viewport');
 const dropzone = document.getElementById('dropzone');
-const panel = createPanel(document.getElementById('panel'));
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -31,23 +35,25 @@ controls.target.set(0, MODEL_HEIGHT * 0.5, 0);
 
 setupEnvironment();
 
+// Panel bölümleri güncel state'i okuyabilsin diye paylaşılan tek bir nesne.
+const state = { model: null, stats: null };
+
+const panel = createPanel(document.getElementById('panel'));
+const landmarkView = createLandmarkView({ scene, camera, renderer });
+const landmarks = createLandmarkController({
+  view: landmarkView,
+  onRefresh: () => panel.refresh(),
+});
+
+registerModelSections(panel, state);
+registerLandmarkSections(panel, landmarks);
+panel.refresh();
+
 const picker = createPicker({
   renderer,
   camera,
-  scene,
-  onPick: (hit) => {
-    panel.addPick(hit);
-    console.log('[pick]', {
-      point: hit.point.toArray().map((value) => Number(value.toFixed(4))),
-      faceIndex: hit.faceIndex,
-      faceVertices: hit.face ? [hit.face.a, hit.face.b, hit.face.c] : null,
-      nearestVertexIndex: hit.nearestVertexIndex,
-      uv: hit.uv ? hit.uv.toArray().map((value) => Number(value.toFixed(4))) : null,
-    });
-  },
+  onPick: (hit) => landmarks.handlePick(hit),
 });
-
-panel.onClearMarkers(() => picker.clearMarkers());
 
 let currentMesh = null;
 
@@ -76,6 +82,7 @@ function setupEnvironment() {
 
 function render() {
   controls.update();
+  landmarkView.update();
   renderer.render(scene, camera);
 }
 
@@ -88,8 +95,15 @@ function onResize() {
 /* -------------------------------------------------------------- model akışı */
 
 async function handleFile(file) {
-  if (!file.name.toLowerCase().endsWith('.glb')) {
-    console.warn('[loader] Sadece .glb dosyaları destekleniyor:', file.name);
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.json')) {
+    await handleAnnotationFile(file);
+    return;
+  }
+
+  if (!name.endsWith('.glb')) {
+    console.warn('[loader] Sadece .glb ve .json dosyaları destekleniyor:', file.name);
     return;
   }
 
@@ -98,6 +112,19 @@ async function handleFile(file) {
     setModel(loaded);
   } catch (error) {
     console.error('[loader] GLB yüklenemedi:', error);
+  }
+}
+
+async function handleAnnotationFile(file) {
+  if (!state.model) {
+    console.warn('[landmark] Önce bir GLB yükle.');
+    return;
+  }
+
+  try {
+    landmarks.applyJSON(await readJSONFile(file));
+  } catch (error) {
+    console.error('[landmark] JSON okunamadı:', error);
   }
 }
 
@@ -111,10 +138,12 @@ function setModel(loaded) {
   currentMesh = loaded.mesh;
   scene.add(currentMesh);
   picker.setTarget(currentMesh);
-  picker.clearMarkers();
+
+  state.model = loaded;
+  state.stats = null;
 
   dropzone.classList.add('dropzone--hidden');
-  panel.setModel(loaded);
+  landmarks.setModel(loaded);
   frameModel(currentMesh);
 
   console.log('[loader] yüklendi:', {
@@ -134,7 +163,8 @@ function analyzeMesh(mesh) {
   const elapsed = performance.now() - started;
 
   mesh.userData.adjacency = graph;
-  panel.setStats(graph.stats);
+  state.stats = graph.stats;
+  panel.refresh();
 
   console.log('[adjacency] mesh istatistikleri:', {
     ...graph.stats,
@@ -148,12 +178,6 @@ function analyzeMesh(mesh) {
       `[adjacency] Mesh ${graph.stats.islandCount} bağlantısız adaya bölünmüş. ` +
         'Geodezik mesafe adalar arasında yürüyemez; bu adalar için ada bazlı ' +
         'en yakın kemik ataması gerekecek.',
-    );
-    console.table(
-      [...graph.islandSizes]
-        .map((size, island) => ({ island, size, ratio: size / graph.stats.weldedCount }))
-        .sort((a, b) => b.size - a.size)
-        .slice(0, 10),
     );
   }
 
