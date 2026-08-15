@@ -22,6 +22,10 @@ const RAMP = [
 
 const MAX_INFLUENCES = 4;
 
+// Bölge görünümünde seçilmemiş yüzeyin rengi ve aktif seçimin rengi.
+const BASE_COLOR = '#9aa3b2';
+const SELECTION_COLOR = '#ffc043';
+
 export function createDebugView() {
   const heatmapMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true,
@@ -92,6 +96,56 @@ export function createDebugView() {
     mesh.material = enabled ? heatmapMaterial : originalMaterial;
   }
 
+  /**
+   * Bölge seçimini ve kayıtlı bölgeleri boyar (Aşama 5).
+   *
+   * Heatmap ile aynı material ve aynı renk attribute'unu kullanıyor: ikisi
+   * aynı anda açık olamaz, panel hangisinin aktif olduğunu yönetiyor.
+   *
+   * @param {object} params
+   * @param {Uint32Array|number[]} params.selection aktif seçim (welded index)
+   * @param {Array} params.regions kayıtlı bölgeler
+   * @param {object} params.graph welded -> orijinal vertex eşlemesi için
+   */
+  function paintRegions({ selection, regions, graph }) {
+    if (!mesh || !graph) return;
+
+    const geometry = mesh.geometry;
+    const vertexCount = geometry.getAttribute('position').count;
+
+    let attribute = geometry.getAttribute('color');
+    if (!attribute || attribute.count !== vertexCount) {
+      attribute = new THREE.BufferAttribute(new Float32Array(vertexCount * 3), 3);
+      geometry.setAttribute('color', attribute);
+    }
+
+    const base = new THREE.Color(BASE_COLOR).convertSRGBToLinear();
+    for (let v = 0; v < vertexCount; v += 1) {
+      attribute.setXYZ(v, base.r, base.g, base.b);
+    }
+
+    const color = new THREE.Color();
+
+    for (const region of regions ?? []) {
+      color.set(region.color).convertSRGBToLinear();
+      for (const welded of region.vertices) {
+        for (const original of graph.weldedToOriginal[welded]) {
+          attribute.setXYZ(original, color.r, color.g, color.b);
+        }
+      }
+    }
+
+    // Aktif seçim en üstte: kayıtlı bölgelerin üzerine yazıyor.
+    color.set(SELECTION_COLOR).convertSRGBToLinear();
+    for (const welded of selection ?? []) {
+      for (const original of graph.weldedToOriginal[welded]) {
+        attribute.setXYZ(original, color.r, color.g, color.b);
+      }
+    }
+
+    attribute.needsUpdate = true;
+  }
+
   function setWireframe(enabled) {
     heatmapMaterial.wireframe = enabled;
     if (originalMaterial) originalMaterial.wireframe = enabled;
@@ -109,7 +163,9 @@ export function createDebugView() {
   return {
     setMesh,
     paintBoneWeights,
+    paintRegions,
     setHeatmapEnabled,
+    setOverlayEnabled: setHeatmapEnabled,
     setWireframe,
     clearColors,
     get isHeatmapEnabled() {
