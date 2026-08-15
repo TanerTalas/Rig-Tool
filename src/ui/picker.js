@@ -45,7 +45,12 @@ export function createPicker({ renderer, camera, onPick }) {
     if (moved > DRAG_THRESHOLD_PX || !enabled) return;
 
     const hit = pick(event);
-    if (hit) onPick?.(hit);
+    if (!hit) return;
+
+    // Bölge seçiminde Shift ekliyor, Alt çıkarıyor.
+    hit.shiftKey = event.shiftKey;
+    hit.altKey = event.altKey;
+    onPick?.(hit);
   });
 
   function pick(event) {
