@@ -47,6 +47,7 @@ const PROPORTIONS = [
 ];
 
 const SYMMETRY_BONES = [
+  { name: 'köprücük', left: ['leftClavicle', 'leftShoulder'], right: ['rightClavicle', 'rightShoulder'] },
   { name: 'üst kol', left: ['leftShoulder', 'leftElbow'], right: ['rightShoulder', 'rightElbow'] },
   { name: 'ön kol', left: ['leftElbow', 'leftWrist'], right: ['rightElbow', 'rightWrist'] },
   { name: 'uyluk', left: ['leftHip', 'leftKnee'], right: ['rightHip', 'rightKnee'] },
