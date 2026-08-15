@@ -30,6 +30,7 @@ export function createWeightController({
   let power = DEFAULT_WEIGHT_OPTIONS.power;
   let smoothIterations = DEFAULT_WEIGHT_OPTIONS.smoothIterations;
   let method = 'geodesic';
+  let radiusNormalization = DEFAULT_WEIGHT_OPTIONS.radiusNormalization;
   let weights = null;
   let stats = null;
   let leakage = null;
@@ -53,6 +54,9 @@ export function createWeightController({
     },
     get smoothIterations() {
       return smoothIterations;
+    },
+    get radiusNormalization() {
+      return radiusNormalization;
     },
     get results() {
       return results;
@@ -91,6 +95,11 @@ export function createWeightController({
       refresh();
     },
 
+    setRadiusNormalization(value) {
+      radiusNormalization = value;
+      refresh();
+    },
+
     /** Weight hesapla ve SkinnedMesh'e geç. */
     compute() {
       const mesh = getBaseMesh();
@@ -113,6 +122,7 @@ export function createWeightController({
         weights = computeGeodesicWeights(mesh.geometry, rig.skeleton, graph, {
           power,
           smoothIterations,
+          radiusNormalization,
           // Ayak kemiğinin sanal kuyruğu modelin baktığı yöne uzanmalı.
           facing: landmarks.validation?.info?.facing?.direction ?? 1,
         });

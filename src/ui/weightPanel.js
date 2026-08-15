@@ -1,4 +1,4 @@
-import { button, element, formatNumber, select, slider, stat } from './dom.js';
+import { button, checkbox, element, formatNumber, select, slider, stat } from './dom.js';
 import { TEST_POSES } from '../core/pose.js';
 import { WEIGHT_METHODS } from './weightController.js';
 
@@ -35,11 +35,16 @@ export function registerWeightSections(panel, controller) {
             { min: 0, max: 5, step: 1 },
             (value) => controller.setSmoothIterations(value),
           ),
+          checkbox('Kemik kalınlığını hesaba kat', controller.radiusNormalization, (value) =>
+            controller.setRadiusNormalization(value),
+          ),
           element(
             'p',
             'hint',
             'Mesafe mesh yüzeyinde yürüyerek ölçülüyor: havada yakın ama yüzeyde ' +
-              'uzak olan kemikler (el ile uyluk gibi) artık ağırlık sızdırmıyor.',
+              'uzak olan kemikler (el ile uyluk gibi) ağırlık sızdırmıyor. Kalınlık ' +
+              'hesaba katılınca mesafe kemik ekseninden değil uzvun yüzeyinden ' +
+              'ölçülür; ince kol, kalın gövdenin duvarını kendine çekemez.',
           ),
         );
       } else {
