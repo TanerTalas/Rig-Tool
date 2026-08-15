@@ -22,9 +22,16 @@ export const TEST_POSES = [
     label: 'Kolları kaldır',
     // Karakter +Z'ye bakıyor, solu +X. Sol kolu kaldırmak için +Z ekseninde
     // pozitif, sağ kol için negatif dönüş gerekiyor.
+    //
+    // Dönüş köprücük ile üst kol arasında paylaştırılıyor. Gerçek omuz da
+    // böyle çalışıyor ve tek kemiğe 60 derece vermek omuz bölgesini
+    // yassılaştırıyor: aynı toplam açı 15+45 olarak dağıtılınca omuz
+    // dolgunluğunu koruyor.
     rotations: {
-      'LeftArm': { z: 60 * DEGREE },
-      'RightArm': { z: -60 * DEGREE },
+      'LeftShoulder': { z: 15 * DEGREE },
+      'LeftArm': { z: 45 * DEGREE },
+      'RightShoulder': { z: -15 * DEGREE },
+      'RightArm': { z: -45 * DEGREE },
     },
   },
   {
