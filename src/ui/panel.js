@@ -1,136 +1,53 @@
+import { element } from './dom.js';
+
 /**
- * Sağ üstteki bilgi paneli.
+ * Sağ üstteki panel kabuğu.
  *
- * Aşama 0'da sadece model ve mesh istatistiklerini gösteriyor; ilerleyen
- * aşamalarda landmark listesi, bölge listesi ve weight parametreleri buraya
- * eklenecek. DOM elle kuruluyor, UI kütüphanesi eklemeye gerek yok.
+ * Panel kendi içeriğini bilmiyor: her özellik (model bilgisi, landmark akışı,
+ * ileride bölge listesi ve weight parametreleri) kendi bölümünü kaydediyor.
+ * `refresh()` çağrıldığında bölümler yeniden render ediliyor.
  */
 export function createPanel(root) {
-  const state = {
-    model: null,
-    stats: null,
-    picks: [],
-  };
+  const sections = [];
 
-  let onClearMarkers = null;
+  function refresh() {
+    // Panelin kaydırma konumu render sonrası kaybolmasın.
+    const scrollTop = root.scrollTop;
+    root.innerHTML = '';
 
-  function render() {
-    if (!state.model) {
-      root.classList.add('panel--empty');
-      root.innerHTML = '';
-      return;
+    let rendered = 0;
+    for (const definition of sections) {
+      const content = definition.render();
+      if (!content) continue;
+
+      const children = Array.isArray(content) ? content.filter(Boolean) : [content];
+      if (!children.length) continue;
+
+      root.append(
+        element(
+          'div',
+          'panel__section',
+          null,
+          definition.title ? element('h2', 'panel__title', definition.title()) : null,
+          ...children,
+        ),
+      );
+      rendered += 1;
     }
 
-    root.classList.remove('panel--empty');
-    root.innerHTML = '';
-    root.append(modelSection(state.model), meshSection(state.stats), picksSection(state.picks));
-
-    root.querySelector('[data-action="clear-markers"]')?.addEventListener('click', () => {
-      state.picks = [];
-      onClearMarkers?.();
-      render();
-    });
-  }
-
-  function modelSection(model) {
-    return section('Model', [
-      stat('dosya', model.fileName),
-      stat('mesh', String(model.meshCount)),
-      stat('hash', model.modelHash.slice(7, 19)),
-    ]);
-  }
-
-  function meshSection(stats) {
-    if (!stats) return section('Mesh', [element('p', 'list__empty', 'analiz bekleniyor')]);
-
-    const islandWarning = stats.islandCount > 1;
-
-    return section('Mesh', [
-      stat('vertex', formatNumber(stats.vertexCount)),
-      stat('welded', formatNumber(stats.weldedCount)),
-      stat('duplicate', formatNumber(stats.duplicateCount)),
-      stat('kenar', formatNumber(stats.edgeCount)),
-      stat('ort. komşu', stats.avgNeighbors.toFixed(2)),
-      stat('ada', String(stats.islandCount), islandWarning),
-      stat('en büyük ada', `%${(stats.largestIslandRatio * 100).toFixed(1)}`, islandWarning),
-    ]);
-  }
-
-  function picksSection(picks) {
-    // Son 8 tıklama, en yenisi üstte.
-    const items = picks.slice(-8).reverse().map((pick, offset) =>
-      element(
-        'li',
-        'list__item',
-        null,
-        element('span', null, `#${picks.length - offset}`),
-        element('span', null, formatVector(pick.point)),
-      ),
-    );
-
-    const body = picks.length
-      ? element('ul', 'list', null, ...items)
-      : element('p', 'list__empty', 'modele tıkla');
-
-    const button = element('button', 'button', "Marker'ları temizle");
-    button.dataset.action = 'clear-markers';
-
-    return section(`Tıklamalar (${picks.length})`, [
-      body,
-      button,
-      element('p', 'hint', 'Detaylı raycast çıktısı konsolda.'),
-    ]);
+    root.classList.toggle('panel--empty', rendered === 0);
+    root.scrollTop = scrollTop;
   }
 
   return {
-    setModel(model) {
-      state.model = model;
-      state.stats = null;
-      state.picks = [];
-      render();
+    /**
+     * @param {{ title?: () => string, render: () => (Node|Node[]|null) }} definition
+     * title ve render fonksiyon: bölümler her refresh'te güncel state'i okuyor.
+     */
+    addSection(definition) {
+      sections.push(definition);
+      return { refresh };
     },
-    setStats(stats) {
-      state.stats = stats;
-      render();
-    },
-    addPick(pick) {
-      state.picks.push(pick);
-      render();
-    },
-    onClearMarkers(handler) {
-      onClearMarkers = handler;
-    },
+    refresh,
   };
-}
-
-/* ------------------------------------------------------------------ helpers */
-
-function section(title, children) {
-  return element('div', 'panel__section', null, element('h2', 'panel__title', title), ...children);
-}
-
-function stat(label, value, warn = false) {
-  return element(
-    'div',
-    'stat',
-    null,
-    element('span', 'stat__label', label),
-    element('span', `stat__value${warn ? ' stat__value--warn' : ''}`, value),
-  );
-}
-
-function element(tag, className, text, ...children) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== null && text !== undefined) node.textContent = text;
-  node.append(...children);
-  return node;
-}
-
-function formatNumber(value) {
-  return value.toLocaleString('tr-TR');
-}
-
-function formatVector(vector) {
-  return `${vector.x.toFixed(3)}, ${vector.y.toFixed(3)}, ${vector.z.toFixed(3)}`;
 }
