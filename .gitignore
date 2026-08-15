@@ -468,6 +468,8 @@ assets/
 models/
 exports/
 
-# Saved annotation output
+# Saved annotation output (model adı önek olarak geliyor: boy.landmarks.json)
 landmarks.json
 regions.json
+*.landmarks*.json
+*.regions*.json
