@@ -1,5 +1,6 @@
 import { button, element, formatNumber, select, slider, stat } from './dom.js';
 import { TEST_POSES } from '../core/pose.js';
+import { WEIGHT_METHODS } from './weightController.js';
 
 /**
  * Weight bölümü.
@@ -10,26 +11,92 @@ import { TEST_POSES } from '../core/pose.js';
  */
 export function registerWeightSections(panel, controller) {
   panel.addSection({
-    title: () => 'Weight (naif)',
+    title: () => 'Weight',
     render: () => {
       if (!controller.canCompute) {
         if (!controller.isReadyForModel) return null;
         return [element('p', 'list__empty', 'iskelet kurulunca hesaplanabilir')];
       }
 
-      return [
+      const nodes = [
+        select('yöntem', controller.method, WEIGHT_METHODS, (value) =>
+          controller.setMethod(value),
+        ),
         slider('mesafe üssü (p)', controller.power, { min: 1, max: 8, step: 0.5 }, (value) =>
           controller.setPower(value),
+        ),
+      ];
+
+      if (controller.method === 'geodesic') {
+        nodes.push(
+          slider(
+            'yumuşatma',
+            controller.smoothIterations,
+            { min: 0, max: 5, step: 1 },
+            (value) => controller.setSmoothIterations(value),
+          ),
+          element(
+            'p',
+            'hint',
+            'Mesafe mesh yüzeyinde yürüyerek ölçülüyor: havada yakın ama yüzeyde ' +
+              'uzak olan kemikler (el ile uyluk gibi) artık ağırlık sızdırmıyor.',
+          ),
+        );
+      } else {
+        nodes.push(
+          element(
+            'p',
+            'hint',
+            'Düz Öklid mesafesi. Referans amaçlı: geodezik sonucun ne kadar ' +
+              'iyileştirdiğini görmek için.',
+          ),
+        );
+      }
+
+      nodes.push(
+        button(controller.isSkinned ? 'Yeniden hesapla' : 'Weight hesapla', () =>
+          controller.compute(),
+        ),
+      );
+
+      return nodes;
+    },
+  });
+
+  panel.addSection({
+    title: () => 'Karşılaştırma',
+    render: () => {
+      const { naive, geodesic } = controller.results;
+      if (!naive || !geodesic) {
+        if (!naive && !geodesic) return null;
+        return [
+          element(
+            'p',
+            'hint',
+            'Diğer yöntemi de bir kez hesapla, sonuçlar burada yan yana görünsün.',
+          ),
+        ];
+      }
+
+      return [
+        comparisonRow('', 'naif', 'geodezik', true),
+        comparisonRow('süre', `${naive.elapsedMs.toFixed(0)}ms`, `${geodesic.elapsedMs.toFixed(0)}ms`),
+        comparisonRow(
+          'sızıntı',
+          `%${(naive.leakingRatio * 100).toFixed(1)}`,
+          `%${(geodesic.leakingRatio * 100).toFixed(1)}`,
+        ),
+        comparisonRow('boşta kemik', String(naive.orphanBones), String(geodesic.orphanBones)),
+        comparisonRow(
+          'ort. kemik',
+          naive.avgInfluences.toFixed(2),
+          geodesic.avgInfluences.toFixed(2),
         ),
         element(
           'p',
           'hint',
-          'w = 1 / (d^p + eps). p büyüdükçe en yakın kemik baskınlaşır, ' +
-            'küçüldükçe ağırlık daha çok kemiğe yayılır.',
-        ),
-        button(
-          controller.isSkinned ? 'Yeniden hesapla' : 'Naif weight hesapla',
-          () => controller.compute(),
+          'Boşta kemik = hiçbir vertex\'e hükmetmeyen kemik sayısı. ' +
+            'Sızıntı = gövde vertex\'lerinin kol kemiklerinden ağırlık alan oranı.',
         ),
       ];
     },
@@ -94,4 +161,16 @@ export function registerWeightSections(panel, controller) {
       ];
     },
   });
+}
+
+/** Karşılaştırma tablosunun tek satırı: etiket + iki sütun. */
+function comparisonRow(label, left, right, header = false) {
+  return element(
+    'div',
+    `compare${header ? ' compare--header' : ''}`,
+    null,
+    element('span', 'compare__label', label),
+    element('span', 'compare__value', left),
+    element('span', 'compare__value', right),
+  );
 }

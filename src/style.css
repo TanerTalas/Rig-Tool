@@ -386,6 +386,27 @@ body {
   background: var(--panel-border);
 }
 
+.compare {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  font: var(--mono);
+  color: var(--text-dim);
+}
+
+.compare--header {
+  color: var(--text);
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 3px;
+  margin-bottom: 3px;
+}
+
+.compare__value {
+  min-width: 52px;
+  text-align: right;
+  color: var(--text);
+}
+
 /* Rampa debugView.js'teki RAMP ile aynı duraklarda olmalı. */
 .legend {
   margin: 10px 0 8px;
