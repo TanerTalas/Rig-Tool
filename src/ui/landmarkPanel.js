@@ -109,6 +109,47 @@ export function registerLandmarkSections(panel, controller) {
   });
 
   panel.addSection({
+    title: () => 'Kontrol',
+    render: () => {
+      if (!controller.isReady) return null;
+
+      const validation = controller.validation;
+      if (!validation) {
+        return [element('p', 'list__empty', 'tüm landmark\'lar yerleşince çalışır')];
+      }
+
+      const nodes = [];
+      const facing = validation.info.facing;
+      if (facing?.reliable) {
+        nodes.push(
+          stat('bakış yönü', facing.direction > 0 ? '+Z' : '-Z'),
+          stat('orta çizgi', validation.info.midline.toFixed(3)),
+        );
+      }
+
+      if (!validation.issues.length) {
+        nodes.push(element('p', 'status status--ok', '✓ kontroller temiz'));
+        return nodes;
+      }
+
+      for (const issue of validation.issues) {
+        nodes.push(element('p', `issue issue--${issue.level}`, issue.message));
+
+        if (issue.swappable && issue.group) {
+          nodes.push(
+            button(
+              issue.group === 'arms' ? 'Kolları sol/sağ değiştir' : 'Bacakları sol/sağ değiştir',
+              () => controller.swapGroup(issue.group),
+            ),
+          );
+        }
+      }
+
+      return nodes;
+    },
+  });
+
+  panel.addSection({
     title: () => 'İskelet',
     render: () => {
       if (!controller.isReady) return null;

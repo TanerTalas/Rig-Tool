@@ -1,6 +1,7 @@
 import { createLandmarkStore, getLandmarkDefinition, humanoidTemplate } from '../core/landmarks.js';
 import { buildSkeleton } from '../core/skeleton.js';
 import { checkModelHash, downloadJSON, pickJSONFile } from '../core/annotations.js';
+import { MIRROR_GROUPS, validateLandmarks } from '../core/validate.js';
 
 /**
  * Landmark akışının beyni: depo, sahne görselleştirmesi ve panel arasında
@@ -22,11 +23,42 @@ export function createLandmarkController({ view, onRefresh, onSkeletonChange }) 
   let skeletonError = null;
   let lastPlacement = null;
 
+  let validation = null;
+
   store.subscribe(() => {
     view.setLandmarks(store.entries());
     rebuildSkeleton();
+    runValidation();
     refresh();
   });
+
+  /**
+   * Denetim sadece set tamamlanınca çalışıyor: eksik landmark'la yapılan
+   * kontroller yarısı boş bir iskelet hakkında yanıltıcı sonuç verir, ayrıca
+   * mesh içi testi her tıklamada çalıştırmaya değmez.
+   */
+  function runValidation() {
+    if (store.missingIds.length || !model) {
+      validation = null;
+      return;
+    }
+
+    validation = validateLandmarks(store.toMap(), model.mesh);
+
+    const errors = validation.issues.filter((issue) => issue.level === 'error');
+    const warnings = validation.issues.filter((issue) => issue.level === 'warn');
+
+    console.log('[validate]', {
+      midline: Number(validation.info.midline.toFixed(4)),
+      facing: validation.info.facing?.direction > 0 ? '+Z' : '-Z',
+      errors: errors.length,
+      warnings: warnings.length,
+    });
+    for (const issue of validation.issues) {
+      const log = issue.level === 'error' ? console.error : console.warn;
+      log(`[validate] ${issue.message}`);
+    }
+  }
 
   function refresh() {
     view.setActive(activeId);
@@ -155,6 +187,21 @@ export function createLandmarkController({ view, onRefresh, onSkeletonChange }) 
 
     get lastPlacement() {
       return lastPlacement;
+    },
+
+    get validation() {
+      return validation;
+    },
+
+    /** Denetimin bulduğu sol/sağ karışıklığını tek hamlede düzeltir. */
+    swapGroup(group) {
+      const pairs = MIRROR_GROUPS[group];
+      if (!pairs) return;
+
+      for (const pair of pairs) {
+        store.swap(pair.left, pair.right);
+      }
+      console.log(`[landmark] ${group} sol/sağ takas edildi.`);
     },
 
     /** Picker'dan gelen tıklama. */
