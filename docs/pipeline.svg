@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 200" width="1200" height="200" role="img" aria-label="Rig Tool akışı: yükle, landmark, iskelet, ağırlık, bölge, export">
+  <defs>
+    <linearGradient id="track" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2b4a7d"/>
+      <stop offset="50%" stop-color="#6c4aa8"/>
+      <stop offset="100%" stop-color="#a8483c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="200" rx="16" fill="#0f1115" stroke="#242b36"/>
+  <rect x="34" y="152" width="1132" height="3" rx="1.5" fill="url(#track)" opacity="0.55"/>
+
+  <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">
+    <!-- 1 -->
+    <g>
+      <rect x="24" y="30" width="176" height="104" rx="12" fill="#151922" stroke="#242c39"/>
+      <circle cx="52" cy="58" r="13" fill="#16202e" stroke="#2c4260"/>
+      <text x="52" y="63" fill="#7fb0ff" font-size="13" font-weight="700" text-anchor="middle">1</text>
+      <text x="76" y="63" fill="#e9eff8" font-size="15" font-weight="600">Yükle</text>
+      <text x="42" y="92" fill="#8296ae" font-size="12">GLB'yi sürükle. Ölçek</text>
+      <text x="42" y="110" fill="#8296ae" font-size="12">normalize, graf kurulur.</text>
+      <circle cx="112" cy="153" r="5.5" fill="#2b4a7d" stroke="#0f1115" stroke-width="3"/>
+    </g>
+    <!-- 2 -->
+    <g>
+      <rect x="216" y="30" width="176" height="104" rx="12" fill="#151922" stroke="#242c39"/>
+      <circle cx="244" cy="58" r="13" fill="#16202e" stroke="#2c4260"/>
+      <text x="244" y="63" fill="#7fb0ff" font-size="13" font-weight="700" text-anchor="middle">2</text>
+      <text x="268" y="63" fill="#e9eff8" font-size="15" font-weight="600">Landmark</text>
+      <text x="234" y="92" fill="#8296ae" font-size="12">Omuz, dirsek, diz… tıkla.</text>
+      <text x="234" y="110" fill="#8296ae" font-size="12">Sol taraf sağa aynalanır.</text>
+      <circle cx="304" cy="153" r="5.5" fill="#3a4c86" stroke="#0f1115" stroke-width="3"/>
+    </g>
+    <!-- 3 -->
+    <g>
+      <rect x="408" y="30" width="176" height="104" rx="12" fill="#151922" stroke="#242c39"/>
+      <circle cx="436" cy="58" r="13" fill="#16202e" stroke="#2c4260"/>
+      <text x="436" y="63" fill="#7fb0ff" font-size="13" font-weight="700" text-anchor="middle">3</text>
+      <text x="460" y="63" fill="#e9eff8" font-size="15" font-weight="600">İskelet</text>
+      <text x="426" y="92" fill="#8296ae" font-size="12">20 kemik kurulur, oran ve</text>
+      <text x="426" y="110" fill="#8296ae" font-size="12">simetri denetlenir.</text>
+      <circle cx="496" cy="153" r="5.5" fill="#524a9b" stroke="#0f1115" stroke-width="3"/>
+    </g>
+    <!-- 4 -->
+    <g>
+      <rect x="600" y="30" width="176" height="104" rx="12" fill="#151922" stroke="#242c39"/>
+      <circle cx="628" cy="58" r="13" fill="#16202e" stroke="#2c4260"/>
+      <text x="628" y="63" fill="#7fb0ff" font-size="13" font-weight="700" text-anchor="middle">4</text>
+      <text x="652" y="63" fill="#e9eff8" font-size="15" font-weight="600">Ağırlık</text>
+      <text x="618" y="92" fill="#8296ae" font-size="12">Geodezik weight, heatmap</text>
+      <text x="618" y="110" fill="#8296ae" font-size="12">ve test pozuyla doğrula.</text>
+      <circle cx="688" cy="153" r="5.5" fill="#7d4794" stroke="#0f1115" stroke-width="3"/>
+    </g>
+    <!-- 5 -->
+    <g>
+      <rect x="792" y="30" width="176" height="104" rx="12" fill="#151922" stroke="#242c39"/>
+      <circle cx="820" cy="58" r="13" fill="#16202e" stroke="#2c4260"/>
+      <text x="820" y="63" fill="#7fb0ff" font-size="13" font-weight="700" text-anchor="middle">5</text>
+      <text x="844" y="63" fill="#e9eff8" font-size="15" font-weight="600">Bölge</text>
+      <text x="810" y="92" fill="#8296ae" font-size="12">Atkı, saç, el seç; adını ver;</text>
+      <text x="810" y="110" fill="#8296ae" font-size="12">bir kemiğe sabitle.</text>
+      <circle cx="880" cy="153" r="5.5" fill="#9a4667" stroke="#0f1115" stroke-width="3"/>
+    </g>
+    <!-- 6 -->
+    <g>
+      <rect x="984" y="30" width="192" height="104" rx="12" fill="#151922" stroke="#2f3a49"/>
+      <circle cx="1012" cy="58" r="13" fill="#1b1a15" stroke="#403a26"/>
+      <text x="1012" y="63" fill="#ffc857" font-size="13" font-weight="700" text-anchor="middle">6</text>
+      <text x="1036" y="63" fill="#e9eff8" font-size="15" font-weight="600">Export</text>
+      <text x="1002" y="92" fill="#8296ae" font-size="12">.rigged.glb + .rig.json</text>
+      <text x="1002" y="110" fill="#8296ae" font-size="12">+ .context.md</text>
+      <circle cx="1080" cy="153" r="5.5" fill="#a8483c" stroke="#0f1115" stroke-width="3"/>
+    </g>
+
+    <text x="34" y="182" fill="#5c6c80" font-size="11">her adım öncekinin üstüne kuruluyor — landmark olmadan iskelet, iskelet olmadan ağırlık yok</text>
+  </g>
+</svg>
